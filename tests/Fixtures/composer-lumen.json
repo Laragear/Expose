@@ -1,0 +1,6 @@
+{
+    "name": "acme/lumen-app",
+    "require": {
+        "laravel/lumen-framework": "^10.0"
+    }
+}

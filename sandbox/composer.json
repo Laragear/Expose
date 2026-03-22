@@ -1,0 +1,22 @@
+{
+    "name": "developer/app",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../package"
+        }
+    ],
+    "require": {
+        "laragear/expose": "*"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": true
+    },
+    "extra": {
+        "expose": {
+            "tunnel": "cloudflare"
+        }
+    }
+}

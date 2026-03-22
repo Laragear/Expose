@@ -1,0 +1,6 @@
+{
+    "name": "acme/yii-app",
+    "require": {
+        "yiisoft/yii2": "^2.0"
+    }
+}

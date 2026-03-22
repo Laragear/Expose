@@ -1,0 +1,77 @@
+{
+    "name": "laragear/expose",
+    "description": "Expose your local PHP project to the internet via popular tunnel services.",
+    "type": "composer-plugin",
+    "license": "MIT",
+    "keywords": [
+        "composer",
+        "plugin",
+        "ngrok",
+        "tunnel",
+        "ssh",
+        "share",
+        "laravel",
+        "symfony",
+        "cakephp",
+        "yii",
+        "wordpress",
+        "localhost"
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "authors": [
+        {
+            "name": "Italo Baeza C.",
+            "email": "DarkGhostHunter@Gmail.com",
+            "homepage": "https://github.com/DarkGhostHunter"
+        }
+    ],
+    "support": {
+        "source": "https://github.com/Laragear/Expose",
+        "issues": "https://github.com/Laragear/Expose/issues"
+    },
+    "require": {
+        "php": "^8.3",
+        "ext-curl": "*",
+        "ext-zip": "*",
+        "illuminate/support": "^12.55.1|^13.1.1",
+        "composer-plugin-api": "^2.6",
+        "symfony/console": "^7.4.7|^8.0.7",
+        "symfony/process": "^7.4.7|^8.0.5"
+    },
+    "require-dev": {
+        "composer/composer": "^2.9.5",
+        "phpunit/phpunit": "^12.5.14|^13.0.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Laragear\\Expose\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit --coverage-clover build/logs/clover.xml",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": true
+    },
+    "extra": {
+        "class": "Laragear\\Expose\\Plugin"
+    },
+    "funding": [
+        {
+            "type": "Github Sponsorship",
+            "url": "https://github.com/sponsors/DarkGhostHunter"
+        },
+        {
+            "type": "Paypal",
+            "url": "https://paypal.me/darkghosthunter"
+        }
+    ]
+}

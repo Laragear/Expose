@@ -1,0 +1,5 @@
+WP_HOME=http://localhost
+WP_SITEURL=http://localhost/wp
+DB_NAME=wordpress
+DB_USER=root
+DB_PASSWORD=secret

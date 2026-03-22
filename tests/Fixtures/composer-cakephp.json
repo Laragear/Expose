@@ -1,0 +1,6 @@
+{
+    "name": "acme/cake-app",
+    "require": {
+        "cakephp/cakephp": "^5.0"
+    }
+}
