@@ -6,7 +6,6 @@ namespace Laragear\Expose\Commands;
 
 use Composer\Command\BaseCommand;
 use Laragear\Expose\Contracts\InstallableTunnel;
-use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\TunnelService;
 use Laragear\Expose\Support\ComposerConfig;
 use Laragear\Expose\Support\TunnelRegistry;

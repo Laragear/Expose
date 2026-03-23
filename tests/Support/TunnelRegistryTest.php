@@ -7,10 +7,10 @@ namespace Tests\Support;
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\TunnelService;
 use Laragear\Expose\Support\TunnelRegistry;
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\AbstractTunnel;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\TestCase;
 
 /** Tests TunnelRegistry built-in loading, project-level discovery, and package-level discovery. */
 class TunnelRegistryTest extends TestCase

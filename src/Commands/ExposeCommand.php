@@ -18,7 +18,6 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
-use function method_exists;
 use const DIRECTORY_SEPARATOR;
 
 /** Exposes the local project to the internet using the configured tunnel service. */

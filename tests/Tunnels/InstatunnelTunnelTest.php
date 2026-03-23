@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\InstatunnelTunnel;
+use Tests\TestCase;
 
 /** Tests the InstatunnelTunnel implementation. */
 class InstatunnelTunnelTest extends TestCase

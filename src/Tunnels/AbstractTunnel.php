@@ -9,7 +9,8 @@ use Laragear\Expose\Support\BinaryManager;
 use RuntimeException;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
-use function method_exists;
+
+;
 
 /**
  * Provides shared behavior for all Tunnel implementations.

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\PinggyTunnel;
+use Tests\TestCase;
 
 /** Tests the PinggyTunnel SSH-based implementation. */
 class PinggyTunnelTest extends TestCase

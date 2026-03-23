@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\ZrokTunnel;
+use Tests\TestCase;
 
 /** Tests the ZrokTunnel implementation. */
 class ZrokTunnelTest extends TestCase

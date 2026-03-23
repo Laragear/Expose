@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Contracts;
 
-use Laragear\Expose\Support\BinaryManager;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 
