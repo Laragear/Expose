@@ -9,6 +9,7 @@ use Laragear\Expose\Support\ComposerConfig;
 use Laragear\Expose\Support\TunnelRegistry;
 use RuntimeException;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use function app;
 
 /**
  * Shared tunnel-resolution logic for all Expose commands.
@@ -21,7 +22,7 @@ trait ResolvesTunnel
      */
     protected function registry(): TunnelRegistry
     {
-        return new TunnelRegistry((string) getcwd());
+        return app(TunnelRegistry::class);
     }
 
     /**

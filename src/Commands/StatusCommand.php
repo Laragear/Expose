@@ -37,8 +37,8 @@ class StatusCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $config = new ComposerConfig(getcwd().DIRECTORY_SEPARATOR.'composer.json');
+        $io = app(SymfonyStyle::class);
+        $config = app(ComposerConfig::class);
 
         $key = $this->requireSavedTunnelKey($config, $input->getOption('tunnel'));
         $tunnel = $this->registry()->make($key);
@@ -47,11 +47,13 @@ class StatusCommand extends BaseCommand
 
         if (!$tunnel instanceof InstallableTunnel) {
             $io->warning("{$tunnel->name()} may not be installed.");
+
             return self::SUCCESS;
         }
 
         if (!$tunnel->isInstalled()) {
             $io->warning("{$tunnel->name()} is not installed.");
+
             return self::SUCCESS;
         }
 

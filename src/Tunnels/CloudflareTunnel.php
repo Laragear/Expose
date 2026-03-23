@@ -50,7 +50,7 @@ class CloudflareTunnel extends AbstractTunnel
     public function configure(SymfonyStyle $io, array $values): void
     {
         if (! empty($values['token'])) {
-            $this->buildProcess([$this->binaryCommand(), 'service', 'install', $values['token']])->run();
+            $this->buildProcess($this->binaryCommand(), 'service', 'install')->args($values['token'])->run();
 
             $io->success('Cloudflare Tunnel token installed.');
         }
@@ -61,13 +61,13 @@ class CloudflareTunnel extends AbstractTunnel
      */
     public function start(string $host = 'localhost', int $port = 8080): Process
     {
-        $process = $this->buildProcess([
+        $process = $this->buildProcess(
             $this->binaryCommand(),
             'tunnel',
             '--url', "http://$host:$port",
             '--metrics', 'localhost:' . self::METRICS_PORT,
             '--no-autoupdate',
-        ]);
+        )->process();
 
         $process->start();
 

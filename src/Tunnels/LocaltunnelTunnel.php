@@ -52,9 +52,10 @@ class LocaltunnelTunnel extends AbstractTunnel
      */
     public function start(string $host = 'localhost', int $port = 8080): Process
     {
-        $command = [$this->binaryCommand(), '--port', (string) $port, '--local-host', $host];
+        $process = $this->buildProcess(
+            $this->binaryCommand(), '--port', (string) $port, '--local-host', $host
+        )->process();
 
-        $process = $this->buildProcess($command);
         $process->start();
 
         return $process;

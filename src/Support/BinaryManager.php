@@ -17,22 +17,14 @@ class BinaryManager
     /**
      * Relative path inside the project root where downloaded binaries are stored.
      */
-    protected const string BIN_DIR = '.expose' . DIRECTORY_SEPARATOR . 'bin';
+    protected string $binariesDir = '.expose'.DIRECTORY_SEPARATOR.'bin';
 
     /**
      * Create a new Binary Manager instance.
      */
-    public function __construct(protected readonly string $projectRoot)
+    public function __construct(protected File $file, protected ProcessFactory $process, string $projectRoot)
     {
-        //
-    }
-
-    /**
-     * Returns the absolute path to the local bin directory managed by Expose.
-     */
-    public function binDir(): string
-    {
-        return $this->projectRoot.DIRECTORY_SEPARATOR.self::BIN_DIR;
+        $this->binariesDir = $projectRoot.DIRECTORY_SEPARATOR.$this->binariesDir;
     }
 
     /**
@@ -40,9 +32,9 @@ class BinaryManager
      */
     public function binPath(string $binary): string
     {
-        $suffix = PHP_OS_FAMILY === 'Windows' ? '.exe' : '';
+        $suffix = $this->process->isWindows() ? '.exe' : '';
 
-        return $this->binDir().DIRECTORY_SEPARATOR.$binary.$suffix;
+        return $this->binariesDir.DIRECTORY_SEPARATOR.$binary.$suffix;
     }
 
     /**
@@ -51,7 +43,7 @@ class BinaryManager
     public function isInstalled(string $binary): bool
     {
         return $this->findOnPath($binary) !== null
-            || file_exists($this->binPath($binary));
+            || $this->file->exists($this->binPath($binary));
     }
 
     /**
@@ -59,7 +51,7 @@ class BinaryManager
      */
     public function isNpmAvailable(): bool
     {
-        return (new ExecutableFinder())->find('npm') !== null;
+        return $this->findOnPath('npm') !== null;
     }
 
     /**
@@ -67,7 +59,7 @@ class BinaryManager
      */
     public function findOnPath(string $binary): ?string
     {
-        return (new ExecutableFinder())->find($binary);
+        return $this->file->findOnPath($binary);
     }
 
     /**
@@ -81,7 +73,7 @@ class BinaryManager
 
         $destination = $this->binPath($binary);
 
-        $process = new Process(['curl', '-fsSL', '-o', $destination, $url]);
+        $process = $this->process->command('curl', '-fsSl', '-o', $destination, $url)->process();
         $process->setTimeout(120);
         $process->run();
 
@@ -89,8 +81,8 @@ class BinaryManager
             throw new RuntimeException("Failed to download [$binary] from [$url]: ".$process->getErrorOutput());
         }
 
-        if (PHP_OS_FAMILY !== 'Windows') {
-            chmod($destination, 0755);
+        if ($this->process->isUnix()) {
+            $this->file->chmod($destination, 0755);
         }
     }
 
@@ -99,7 +91,7 @@ class BinaryManager
      */
     public function installViaNpm(string $package): void
     {
-        $process = new Process(['npm', 'install', '-g', $package]);
+        $process = $this->process->command('npm', 'install', '-g', $package)->process();
         $process->setTimeout(120);
         $process->run();
 
@@ -113,9 +105,10 @@ class BinaryManager
      */
     public function uninstallViaNpm(string $package): void
     {
-        $process = new Process(['npm', 'uninstall', '-g', $package]);
-        $process->setTimeout(60);
-        $process->run();
+        $this->process
+            ->command('npm', 'uninstall', '-g', $package)
+            ->setTimeout(120)
+            ->run();
     }
 
     /**
@@ -125,8 +118,8 @@ class BinaryManager
     {
         $path = $this->binPath($binary);
 
-        if (file_exists($path)) {
-            unlink($path);
+        if ($this->file->exists($path)) {
+            $this->file->delete($path);
         }
     }
 
@@ -137,7 +130,7 @@ class BinaryManager
     {
         $localPath = $this->binPath($binary);
 
-        return file_exists($localPath) ? $localPath : $binary;
+        return $this->file->exists($localPath) ? $localPath : $binary;
     }
 
     /**
@@ -145,8 +138,8 @@ class BinaryManager
      */
     protected function ensureBinDirExists(): void
     {
-        if (!is_dir($this->binDir())) {
-            mkdir($this->binDir(), 0755, true);
+        if ($this->file->isNotDir($this->binariesDir)) {
+            $this->file->makeDir($this->binariesDir);
         }
     }
 }

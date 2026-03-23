@@ -95,16 +95,16 @@ class PinggyTunnel extends AbstractTunnel
      */
     public function start(string $host = 'localhost', int $port = 8080): Process
     {
-        $command = [
+        $process = $this->buildProcess(
             'ssh',
-            '-p', (string) self::SSH_PORT,
-            '-R', "0:{$host}:{$port}",
+            '-p',
+            (string) self::SSH_PORT,
+            '-R', "0:$host:$port",
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'ServerAliveInterval=30',
-            self::SSH_SERVER,
-        ];
+            self::SSH_SERVER
+        )->process();
 
-        $process = $this->buildProcess($command);
         $process->start();
 
         return $process;

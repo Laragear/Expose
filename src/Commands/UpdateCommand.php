@@ -38,8 +38,8 @@ class UpdateCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $config = new ComposerConfig(getcwd().DIRECTORY_SEPARATOR.'composer.json');
+        $io = app(SymfonyStyle::class);
+        $config = app(ComposerConfig::class);
         $force = (bool) $input->getOption('force');
 
         $key = $this->requireSavedTunnelKey($config, $input->getOption('tunnel'));
@@ -47,11 +47,13 @@ class UpdateCommand extends BaseCommand
 
         if (!$tunnel instanceof InstallableTunnel) {
             $io->error("{$tunnel->name()} is not installable. You have to install it manually.");
+
             return self::FAILURE;
         }
 
         if (!$tunnel->isInstalled()) {
             $io->error("{$tunnel->name()} does not appear to be installed. Run `composer expose` first.");
+
             return self::FAILURE;
         }
 

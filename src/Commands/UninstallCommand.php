@@ -38,24 +38,27 @@ class UninstallCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $config = new ComposerConfig(getcwd().DIRECTORY_SEPARATOR.'composer.json');
+        $io = app(SymfonyStyle::class);
+        $config = app(ComposerConfig::class);
 
         $key = $this->requireSavedTunnelKey($config, $input->getOption('tunnel'));
         $tunnel = $this->registry()->make($key);
 
         if (!$tunnel instanceof InstallableTunnel) {
             $io->error("{$tunnel->name()} is not uninstallable. You have to remove it manually.");
+
             return self::FAILURE;
         }
 
         if (!$tunnel->isInstalled()) {
             $io->note("{$tunnel->name()} does not appear to be installed.");
+
             return self::SUCCESS;
         }
 
         if (!$io->confirm("Are you sure you want to uninstall {$tunnel->name()}?", false)) {
             $io->text('Uninstall cancelled.');
+
             return self::SUCCESS;
         }
 

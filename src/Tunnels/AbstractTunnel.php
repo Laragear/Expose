@@ -6,11 +6,12 @@ namespace Laragear\Expose\Tunnels;
 
 use Laragear\Expose\Contracts\InstallableTunnel;
 use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\PHP;
+use Laragear\Expose\Support\ProcessFactory;
 use RuntimeException;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
-
-;
+use function array_shift;
 
 /**
  * Provides shared behavior for all Tunnel implementations.
@@ -28,18 +29,19 @@ abstract class AbstractTunnel implements InstallableTunnel
     protected ?string $npmPackageName = null;
 
     /**
-     * Lazily resolved binary manager bound to the working directory.
-     *
-     * @var \Laragear\Expose\Support\BinaryManager|null
+     * Create a new Abstract Tunnel instance.
      */
-    protected ?BinaryManager $binaryManager = null;
+    public function __construct(protected BinaryManager $binaryManager, protected ProcessFactory $processFactory)
+    {
+        //
+    }
 
     /**
      * @inheritDoc
      */
     public function isInstalled(): bool
     {
-        return $this->manager()->isInstalled($this->binary());
+        return $this->binaryManager->isInstalled($this->binary());
     }
 
     /**
@@ -73,7 +75,7 @@ abstract class AbstractTunnel implements InstallableTunnel
     {
         if ($this->isInstallableViaNpm()) {
             $io->text("Updating <info>{$this->name()}</info> via NPM...");
-            $this->manager()->installViaNpm((string) $this->npmPackageName());
+            $this->binaryManager->installViaNpm((string) $this->npmPackageName());
 
             return;
         }
@@ -84,7 +86,7 @@ abstract class AbstractTunnel implements InstallableTunnel
 
         $io->text("Downloading latest <info>{$this->name()}</info> binary...");
 
-        $this->manager()->downloadViaCurl($url, $this->binary());
+        $this->binaryManager->downloadViaCurl($url, $this->binary());
     }
 
     /**
@@ -94,13 +96,15 @@ abstract class AbstractTunnel implements InstallableTunnel
     {
         if ($this->isInstallableViaNpm() && $this->npmPackageName !== null) {
             $io->text("Uninstalling <info>{$this->name()}</info> NPM package...");
-            $this->manager()->uninstallViaNpm($this->npmPackageName);
+
+            $this->binaryManager->uninstallViaNpm($this->npmPackageName);
 
             return;
         }
 
         $io->text("Removing <info>{$this->name()}</info> binary...");
-        $this->manager()->removeBinary($this->binary());
+
+        $this->binaryManager->removeBinary($this->binary());
     }
 
     /**
@@ -136,10 +140,10 @@ abstract class AbstractTunnel implements InstallableTunnel
      */
     protected function isProcessRunning(string $pattern): bool
     {
-        if (PHP_OS_FAMILY === 'Windows') {
-            exec('tasklist /FO CSV /NH 2>NUL', $lines);
+        if ($this->processFactory->isWindows()) {
+            $execution = $this->processFactory->call('tasklist /FO CSV /NH 2>NUL');
 
-            foreach ($lines as $line) {
+            foreach ($execution as $line) {
                 if (stripos($line, $pattern) !== false) {
                     return true;
                 }
@@ -148,9 +152,7 @@ abstract class AbstractTunnel implements InstallableTunnel
             return false;
         }
 
-        exec('pgrep -f ' . escapeshellarg($pattern) . ' 2>/dev/null', $output, $exitCode);
-
-        return $exitCode === 0;
+        return $this->processFactory->command('pgrep', '-f')->args($pattern)->muteErrors()->isSuccessful();
     }
 
     /**
@@ -158,25 +160,15 @@ abstract class AbstractTunnel implements InstallableTunnel
      */
     protected function binaryCommand(): string
     {
-        return $this->manager()->resolveCommand($this->binary());
-    }
-
-    /**
-     * Returns a lazily created BinaryManager bound to the current working directory.
-     */
-    protected function manager(): BinaryManager
-    {
-        return $this->binaryManager ??= new BinaryManager((string) getcwd());
+        return $this->binaryManager->resolveCommand($this->binary());
     }
 
     /**
      * Creates a non-blocking-ready Process from a command array with no timeout.
-     *
-     * @param list<string> $command
      */
-    protected function buildProcess(array $command): Process
+    protected function buildProcess(string $command, string ...$rawArgs): ProcessFactory
     {
-        return (new Process($command, (string) getcwd()))->setTimeout(null);
+        return $this->processFactory->command($command, ...$rawArgs)->setTimeout(null);
     }
 
     /**
@@ -184,7 +176,7 @@ abstract class AbstractTunnel implements InstallableTunnel
      */
     protected function resolveDownloadUrl(): ?string
     {
-        return null;
+        throw new RuntimeException('No resolvable download URL was provided.');
     }
 
     /**
@@ -192,7 +184,7 @@ abstract class AbstractTunnel implements InstallableTunnel
      */
     public function binary(): string
     {
-        return 'unknown binary';
+        throw new RuntimeException('No binary name was provided.');
     }
 
     /**

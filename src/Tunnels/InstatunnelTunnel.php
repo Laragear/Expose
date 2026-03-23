@@ -55,8 +55,7 @@ class InstatunnelTunnel extends AbstractTunnel
     public function configure(SymfonyStyle $io, array $values): void
     {
         if (! empty($values['token'])) {
-            $process = $this->buildProcess([$this->binaryCommand(), 'auth', $values['token']]);
-            $process->run();
+            $this->buildProcess($this->binaryCommand(), 'auth')->args($values['token'])->run();
 
             $io->success('InsTunnel token saved.');
         }
@@ -67,9 +66,7 @@ class InstatunnelTunnel extends AbstractTunnel
      */
     public function start(string $host = 'localhost', int $port = 8080): Process
     {
-        $command = [$this->binaryCommand(), '--port', (string) $port, '--host', $host];
-
-        $process = $this->buildProcess($command);
+        $process = $this->buildProcess($this->binaryCommand(), '--port', (string) $port, '--host', $host)->process();
 
         $process->start();
 

@@ -7,9 +7,13 @@ namespace Laragear\Expose\Support;
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\TunnelService;
 use RuntimeException;
+use function app;
 use function array_column;
 use function array_combine;
-use const DIRECTORY_SEPARATOR;
+use function get_class;
+use function getcwd;
+use function method_exists;
+use const DIRECTORY_SEPARATOR as DS;
 
 /**
  * Builds the authoritative map of available tunnel services by merging built-ins
@@ -45,7 +49,9 @@ class TunnelRegistry
      *
      * @param  string  $projectRoot  The absolute path to the project root (where composer.json lives).
      */
-    public function __construct(protected readonly string $projectRoot)
+    public function __construct(
+        protected File $file,
+        protected readonly string $projectRoot)
     {
         $this->loadBuiltIns();
         $this->loadFromProjectComposerJson();
@@ -62,29 +68,46 @@ class TunnelRegistry
         return array_combine(array_keys($this->tunnels), array_column($this->tunnels, 'label'));
     }
 
-    /** Returns true when the given key has a registered tunnel. */
+    /**
+     * Check if a tunnel was registered.
+     */
     public function has(string $key): bool
     {
         return isset($this->tunnels[$key]);
     }
 
     /**
+     * Check if the tunnel does not exists.
+     */
+    public function missing(string $key): bool
+    {
+        return ! $this->has($key);
+    }
+
+    /**
      * Instantiates and returns the Tunnel for the given key.
-     *
-     * @throws RuntimeException When the key is not registered.
      */
     public function make(string $key): Tunnel
     {
-        if (!$this->has($key)) {
+        if ($this->missing($key)) {
             throw new RuntimeException(
-                "Unknown tunnel service: [$key]. "
-                .'Register it under extra.expose.tunnels in your composer.json.',
+                "Unknown tunnel service: [$key]. Register it under extra.expose.tunnels in your composer.json.",
             );
+        }
+
+        if (!isset($this->tunnels[$key]['class'])) {
+            throw new RuntimeException("The Tunnel Service [$key] does not have a valid class.");
         }
 
         $class = $this->tunnels[$key]['class'];
 
-        return new $class();
+        $container = app();
+
+        if (method_exists($class, 'withContainer')) {
+            $class->withContainer($container);
+        }
+
+        return $container->make($class);
     }
 
     /**
@@ -117,7 +140,7 @@ class TunnelRegistry
 
             $this->tunnels[$service->value] = [
                 'label' => $tunnel->label(),
-                'class' => $tunnel::class,
+                'class' => get_class($tunnel),
             ];
         }
     }
@@ -143,7 +166,7 @@ class TunnelRegistry
      */
     protected function loadFromProjectComposerJson(): void
     {
-        $data = $this->readJson($this->projectRoot.DIRECTORY_SEPARATOR.'composer.json');
+        $data = $this->readJson($this->projectRoot.DS.'composer.json');
 
         $tunnels = $data['extra']['expose'][self::PROJECT_KEY] ?? [];
 
@@ -171,7 +194,7 @@ class TunnelRegistry
      */
     protected function loadFromInstalledPackages(): void
     {
-        $vendorDir = $this->projectRoot.DIRECTORY_SEPARATOR.'vendor';
+        $vendorDir = $this->projectRoot.DS.'vendor';
 
         if (!is_dir($vendorDir)) {
             return;
@@ -217,7 +240,7 @@ class TunnelRegistry
      */
     protected function vendorComposerJsonPaths(string $vendorDir): iterable
     {
-        foreach (glob($vendorDir.DIRECTORY_SEPARATOR.'*'.DIRECTORY_SEPARATOR.'*'. DIRECTORY_SEPARATOR.'composer.json') ?: [] as $path) {
+        foreach (glob($vendorDir.DS.'*'.DS.'*'.DS.'composer.json') ?: [] as $path) {
             yield $path;
         }
     }
@@ -229,33 +252,26 @@ class TunnelRegistry
      */
     protected function readJson(string $path): array
     {
-        if (!file_exists($path)) {
+        if ($this->file->missing($path)) {
             return [];
         }
 
-        $decoded = json_decode(file_get_contents($path), true);
-
-        return is_array($decoded) ? $decoded : [];
+        return json_decode($this->file->get($path), true) ?: [];
     }
 
     /**
      * Asserts that the given class name implements the Tunnel contract.
      *
      * @param  class-string  $class
-     * @throws RuntimeException When the class does not implement Tunnel.
      */
     protected function assertImplementsTunnel(string $class): void
     {
         if (!class_exists($class)) {
-            throw new RuntimeException(
-                "Tunnel class [$class] does not exist. Check your autoloader.",
-            );
+            throw new RuntimeException("Tunnel class [$class] does not exist. Check your autoloader.");
         }
 
         if (!is_a($class, Tunnel::class, true)) {
-            throw new RuntimeException(
-                "Tunnel class [$class] must implement ".Tunnel::class.'.',
-            );
+            throw new RuntimeException("Tunnel class [$class] must implement ".Tunnel::class.'.',);
         }
     }
 }

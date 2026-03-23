@@ -31,8 +31,9 @@ class ConfigureCommand extends BaseCommand
             ->setName('expose:configure')
             ->setDescription('Configure credentials and options for the tunnel service.')
             ->addOption('tunnel', 't', InputOption::VALUE_OPTIONAL, 'Override which tunnel to configure.')
-            ->addOption('reset', null, InputOption::VALUE_NONE,
-                'Reset the preferred tunnel choice stored in composer.json.');
+            ->addOption(
+                'reset', null, InputOption::VALUE_NONE, 'Reset the preferred tunnel choice stored in composer.json.'
+            );
     }
 
     /**
@@ -40,11 +41,12 @@ class ConfigureCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $config = new ComposerConfig(getcwd().DIRECTORY_SEPARATOR.'composer.json');
+        $io = app(SymfonyStyle::class);
+        $config = app(ComposerConfig::class);
 
         if ($input->getOption('reset')) {
             $this->resetTunnelChoice($io, $config);
+
             return self::SUCCESS;
         }
 

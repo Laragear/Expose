@@ -50,7 +50,8 @@ class ZrokTunnel extends AbstractTunnel
     public function configure(SymfonyStyle $io, array $values): void
     {
         if (! empty($values['token'])) {
-            $process = $this->buildProcess([$this->binaryCommand(), 'enable', $values['token']]);
+            $process = $this->buildProcess($this->binaryCommand(), 'enable')->args($values['token'])->process();
+
             $process->run();
 
             $io->success('Zrok enabled with the provided token.');
@@ -62,15 +63,14 @@ class ZrokTunnel extends AbstractTunnel
      */
     public function start(string $host = 'localhost', int $port = 8080): Process
     {
-        $command = [
+        $process = $this->buildProcess(
             $this->binaryCommand(),
             'share', 'public',
             '--backend-mode', 'proxy',
             '--bind-addr', '127.0.0.1:' . self::CONSOLE_PORT,
             "http://$host:$port",
-        ];
+        )->process();
 
-        $process = $this->buildProcess($command);
         $process->start();
 
         return $process;

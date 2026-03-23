@@ -51,7 +51,10 @@ class NgrokTunnel extends AbstractTunnel
     public function configure(SymfonyStyle $io, array $values): void
     {
         if (! empty($values['authtoken'])) {
-            $process = $this->buildProcess([$this->binaryCommand(), 'config', 'add-authtoken', $values['authtoken']]);
+            $process = $this->buildProcess($this->binaryCommand(), 'config', 'add-authtoken')
+                ->args($values['authtoken'])
+                ->process();
+
             $process->run();
 
             $io->success('ngrok auth token saved.');
@@ -63,7 +66,8 @@ class NgrokTunnel extends AbstractTunnel
      */
     public function start(string $host = 'localhost', int $port = 8080): Process
     {
-        $process = $this->buildProcess([$this->binaryCommand(), 'http', '--log', 'stdout', "{$host}:{$port}"]);
+        $process = $this->buildProcess($this->binaryCommand(), 'http', '--log', 'stdout', "$host:$port")->process();
+
         $process->start();
 
         return $process;
@@ -99,7 +103,7 @@ class NgrokTunnel extends AbstractTunnel
     {
         $io->text('Updating <info>ngrok</info>...');
 
-        $this->buildProcess([$this->binaryCommand(), 'update'])->run();
+        $this->buildProcess($this->binaryCommand(), 'update')->run();
 
         $io->success('ngrok updated.');
     }

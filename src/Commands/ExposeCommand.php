@@ -12,15 +12,19 @@ use Laragear\Expose\Detectors\ProjectDetector;
 use Laragear\Expose\Enums\Framework;
 use Laragear\Expose\Support\BinaryManager;
 use Laragear\Expose\Support\ComposerConfig;
+use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Support\ServerRunner;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
+use function app;
 use const DIRECTORY_SEPARATOR;
 
-/** Exposes the local project to the internet using the configured tunnel service. */
+/**
+ * Exposes the local project to the internet using the configured tunnel service.
+ */
 class ExposeCommand extends BaseCommand
 {
     use ResolvesTunnel;
@@ -53,22 +57,20 @@ class ExposeCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-
+        $io = app(SymfonyStyle::class);
         $host = (string) $input->getOption('host');
         $port = (int) $input->getOption('port');
-        $projectRoot = (string) getcwd();
-        $config = new ComposerConfig($projectRoot.DIRECTORY_SEPARATOR.'composer.json');
-        $framework = $this->detectFramework($io, $projectRoot);
+        $config = app(ComposerConfig::class);
+        $framework = $this->detectFramework($io);
         $tunnel = $this->resolveTunnel($io, $config, $input->getOption('tunnel'));
 
-        if (!$this->checkBinaryInstalled($io, $tunnel, new BinaryManager($projectRoot))) {
+        if (!$this->checkBinaryInstalled($io, $tunnel, app(BinaryManager::class))) {
             return self::FAILURE;
         }
 
-        $io->section("Starting {$framework->label()} project on http://{$host}:{$port}");
+        $io->section("Starting {$framework->label()} project on http://$host:$port");
 
-        $serverProcess = $this->startServer($io, $framework, $host, $port, $projectRoot);
+        $serverProcess = $this->startServer($io, $framework, $host, $port);
         $tunnelProcess = $this->startTunnel($io, $tunnel, $host, $port);
 
         $this->waitForShutdown($io, $serverProcess, $tunnelProcess);
@@ -79,9 +81,9 @@ class ExposeCommand extends BaseCommand
     /**
      * Detects the framework and prints the result to the console.
      */
-    protected function detectFramework(SymfonyStyle $io, string $projectRoot): Framework
+    protected function detectFramework(SymfonyStyle $io): Framework
     {
-        $framework = (new ProjectDetector($projectRoot))->detect();
+        $framework = app(ProjectDetector::class)->detect();
 
         $io->text("Detected project: <info>{$framework->label()}</info>");
 
@@ -126,13 +128,13 @@ class ExposeCommand extends BaseCommand
         $choice = $io->choice(
             'What would you like to do?',
             [
-                'install' => "Install `{$package}` via NPM now",
+                'install' => "Install `$package` via NPM now",
                 'manual' => 'I will install it manually and retry',
             ],
         );
 
         if ($choice === 'manual') {
-            $io->text("Run this command, then try again:  <comment>npm install -g {$package}</comment>");
+            $io->text("Run this command, then try again: <comment>npm install -g $package</comment>");
 
             return false;
         }
@@ -147,22 +149,20 @@ class ExposeCommand extends BaseCommand
     /**
      * Handles the case where a cURL-downloaded tunnel binary is missing.
      */
-    protected function handleMissingDownloadBinary(SymfonyStyle $io, InstallableTunnel $tunnel, BinaryManager $manager): bool
-    {
+    protected function handleMissingDownloadBinary(
+        SymfonyStyle $io,
+        InstallableTunnel $tunnel,
+        BinaryManager $manager,
+    ): bool {
         return $tunnel->install($manager, $io);
     }
 
     /**
      * Starts the local PHP development server.
      */
-    protected function startServer(
-        SymfonyStyle $io,
-        Framework $framework,
-        string $host,
-        int $port,
-        string $projectRoot,
-    ): Process {
-        $process = (new ServerRunner($projectRoot))->start($framework, $host, $port);
+    protected function startServer(SymfonyStyle $io, Framework $framework, string $host, int $port): Process
+    {
+        $process = app(ServerRunner::class)->start($framework, $host, $port);
 
         $io->text('Local server started. Waiting for tunnel URL...');
 
