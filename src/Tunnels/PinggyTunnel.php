@@ -139,7 +139,7 @@ class PinggyTunnel extends AbstractTunnel
         // On Unix/macOS:  pgrep -f "a.pinggy.io" matches the ssh argument list.
         // On Windows:     ssh.exe arguments are not visible via tasklist, so we fall back
         //                 to checking for any running ssh.exe process as a best-effort
-        //                 proxy — the user is unlikely to have other simultaneous SSH
+        //                 proxy - the user is unlikely to have other simultaneous SSH
         //                 sessions in a typical developer workflow.
         //
         // The public URL assigned by Pinggy (e.g. https://xxxxx.a.free.pinggy.link) is

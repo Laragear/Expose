@@ -106,9 +106,9 @@ class ZrokTunnel extends AbstractTunnel
         // When `zrok share public` runs it starts a local HTTP console server at
         // 127.0.0.1:CONSOLE_PORT. The /api/v1/overview endpoint returns a JSON
         // document that includes a "shares" array; each entry contains:
-        //   - "token"           → the unique share identifier
-        //   - "frontendEndpoint"→ the public HTTPS URL (e.g. https://xxx.share.zrok.io)
-        //   - "shareMode"       → "public" or "private"
+        //   - "token"            -> the unique share identifier
+        //   - "frontendEndpoint" -> the public HTTPS URL (e.g. https://xxx.share.zrok.io)
+        //   - "shareMode"        -> "public" or "private"
         //
         // If the console is unreachable (connection refused) or the response cannot
         // be decoded the tunnel is considered not running.
