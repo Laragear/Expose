@@ -7,7 +7,6 @@ namespace Tests\Commands;
 use Laragear\Expose\Commands\StatusCommand;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Tester\CommandTester;
 
 /** Tests StatusCommand output and edge cases. */
 class StatusCommandTest extends CommandTestCase

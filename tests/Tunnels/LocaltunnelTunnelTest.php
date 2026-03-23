@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\LocaltunnelTunnel;
+use Tests\TestCase;
 
 /** Tests the LocaltunnelTunnel implementation. */
 class LocaltunnelTunnelTest extends TestCase

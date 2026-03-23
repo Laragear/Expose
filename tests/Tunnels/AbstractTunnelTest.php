@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\AbstractTunnel;
 use Symfony\Component\Process\Process;
+use Tests\TestCase;
 
 /** Tests the shared behaviour provided by AbstractTunnel. */
 class AbstractTunnelTest extends TestCase

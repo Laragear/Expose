@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use Laragear\Expose\Enums\Framework;
-use Laragear\Expose\Support\ServerRunner;
-use Tests\TestCase;
 use Symfony\Component\Process\Process;
+use Tests\TestCase;
 
 /** Tests that ServerRunner builds correct Process instances per framework. */
 class ServerRunnerTest extends TestCase

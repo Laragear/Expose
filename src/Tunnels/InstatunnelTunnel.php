@@ -27,7 +27,7 @@ class InstatunnelTunnel extends AbstractTunnel
      */
     public function name(): string
     {
-        return 'InsTunnel';
+        return 'InstaTunnel';
     }
 
     /**
@@ -70,9 +70,29 @@ class InstatunnelTunnel extends AbstractTunnel
         $command = [$this->binaryCommand(), '--port', (string) $port, '--host', $host];
 
         $process = $this->buildProcess($command);
+
         $process->start();
 
         return $process;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function status(): array
+    {
+        // InstaTunnel does not expose a local HTTP status API, so process-level detection
+        // is used as the fallback. On Unix/macOS `pgrep -f` matches the npm package name
+        // in the Node.js invocation path (e.g. `.../node_modules/instatunnel/...`).
+        // On Windows `tasklist` output is scanned for the same string.
+        //
+        // The public URL is only available from the binary's stdout at startup and
+        // cannot be retrieved after the fact, so it is always returned as null here.
+        return [
+            'running'     => $this->isProcessRunning($this->npmPackageName ?? $this->binary()),
+            'url'         => null,
+            'connections' => null,
+        ];
     }
 
     /**

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\CloudflareTunnel;
+use Tests\TestCase;
 
 /** Tests the CloudflareTunnel implementation. */
 class CloudflareTunnelTest extends TestCase

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\PinggyTunnel;
+use Tests\TestCase;
 
 /** Tests the PinggyTunnel SSH-based implementation. */
 class PinggyTunnelTest extends TestCase
@@ -59,14 +59,5 @@ class PinggyTunnelTest extends TestCase
 
         static::assertArrayHasKey('subdomain', $options);
         static::assertFalse($options['subdomain']['secret']);
-    }
-
-    public function test_default_status_is_not_running(): void
-    {
-        $status = $this->tunnel->status();
-
-        static::assertFalse($status['running']);
-        static::assertNull($status['url']);
-        static::assertNull($status['connections']);
     }
 }

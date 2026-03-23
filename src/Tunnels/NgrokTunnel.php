@@ -12,7 +12,9 @@ use Symfony\Component\Process\Process;
  */
 class NgrokTunnel extends AbstractTunnel
 {
-    /** The ngrok local API port used to query tunnel status. */
+    /**
+     * The ngrok local API port used to query tunnel status.
+     */
     protected const int API_PORT = 4040;
 
     /**
@@ -73,7 +75,7 @@ class NgrokTunnel extends AbstractTunnel
     public function status(): array
     {
         $context = stream_context_create(['http' => ['timeout' => 2]]);
-        $raw = @file_get_contents('http://127.0.0.1:' . self::API_PORT . '/api/tunnels', false, $context);
+        $raw = @file_get_contents('http://localhost:' . self::API_PORT . '/api/tunnels', false, $context);
 
         if ($raw === false) {
             return ['running' => false, 'url' => null, 'connections' => null];

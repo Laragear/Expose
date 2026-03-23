@@ -6,8 +6,8 @@ namespace Tests\Support;
 
 use JsonException;
 use Laragear\Expose\Support\ComposerConfig;
-use Tests\TestCase;
 use RuntimeException;
+use Tests\TestCase;
 
 /** Tests reading from and writing to the extra.expose block in composer.json. */
 class ComposerConfigTest extends TestCase

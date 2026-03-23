@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Contracts;
 
-use Laragear\Expose\Support\BinaryManager;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 
@@ -40,7 +39,7 @@ interface Tunnel
     /**
      * Returns the current status of the tunnel as an associative array.
      *
-     * @return array{running: bool, url: ?string, connections: int|null, error: ?string}
+     * @return array{running: bool, url: ?string, connections: int|null, error?: ?string}
      */
     public function status(): array;
 }

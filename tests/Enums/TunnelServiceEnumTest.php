@@ -6,14 +6,14 @@ namespace Tests\Enums;
 
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\TunnelService;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\CloudflareTunnel;
 use Laragear\Expose\Tunnels\InstatunnelTunnel;
 use Laragear\Expose\Tunnels\LocaltunnelTunnel;
 use Laragear\Expose\Tunnels\NgrokTunnel;
 use Laragear\Expose\Tunnels\PinggyTunnel;
 use Laragear\Expose\Tunnels\ZrokTunnel;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
 
 /** Tests the TunnelService enum factory, labels, and parsing helpers. */
 class TunnelServiceEnumTest extends TestCase

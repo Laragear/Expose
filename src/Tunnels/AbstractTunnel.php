@@ -9,7 +9,8 @@ use Laragear\Expose\Support\BinaryManager;
 use RuntimeException;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
-use function method_exists;
+
+;
 
 /**
  * Provides shared behavior for all Tunnel implementations.
@@ -73,15 +74,12 @@ abstract class AbstractTunnel implements InstallableTunnel
         if ($this->isInstallableViaNpm()) {
             $io->text("Updating <info>{$this->name()}</info> via NPM...");
             $this->manager()->installViaNpm((string) $this->npmPackageName());
+
             return;
         }
 
-        $url = $this->resolveDownloadUrl();
-
-        if ($url === null) {
-            throw new RuntimeException(
-                "No download URL defined for [{$this->name()}] on this platform."
-            );
+        if (!$url = $this->resolveDownloadUrl()) {
+            throw new RuntimeException("No download URL defined for [{$this->name()}] on this platform.");
         }
 
         $io->text("Downloading latest <info>{$this->name()}</info> binary...");
@@ -131,6 +129,28 @@ abstract class AbstractTunnel implements InstallableTunnel
     public function status(): array
     {
         return ['running' => false, 'url' => null, 'connections' => null, 'error' => null];
+    }
+
+    /**
+     * Checks whether a process matching the given pattern is currently running.
+     */
+    protected function isProcessRunning(string $pattern): bool
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            exec('tasklist /FO CSV /NH 2>NUL', $lines);
+
+            foreach ($lines as $line) {
+                if (stripos($line, $pattern) !== false) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        exec('pgrep -f ' . escapeshellarg($pattern) . ' 2>/dev/null', $output, $exitCode);
+
+        return $exitCode === 0;
     }
 
     /**

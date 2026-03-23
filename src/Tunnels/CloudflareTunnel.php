@@ -13,6 +13,11 @@ use Symfony\Component\Process\Process;
 class CloudflareTunnel extends AbstractTunnel
 {
     /**
+     * The localhost port pinned for the cloudflared Prometheus/readiness metrics server.
+     */
+    protected const int METRICS_PORT = 20241;
+
+    /**
      * @inheritDoc
      */
     public function name(): string
@@ -60,6 +65,7 @@ class CloudflareTunnel extends AbstractTunnel
             $this->binaryCommand(),
             'tunnel',
             '--url', "http://$host:$port",
+            '--metrics', 'localhost:' . self::METRICS_PORT,
             '--no-autoupdate',
         ]);
 
@@ -89,5 +95,39 @@ class CloudflareTunnel extends AbstractTunnel
     public function label(): string
     {
         return 'Cloudflare Tunnel (cloudflared)';
+    }
+
+    /**
+     * Queries the cloudflared readiness endpoint to determine tunnel health.
+     *
+     * The cloudflared process exposes a "/ready" endpoint on its metrics server:
+     *   HTTP 200 + {"status":"ok"}       -> tunnel is connected and proxying traffic.
+     *   HTTP 503 + {"status":"starting"} -> cloudflared is running but not yet connected.
+     *   Connection refused               -> cloudflared is not running at all.
+     *
+     * The public URL is printed by cloudflared to stderr at startup (for quick tunnels)
+     * and is not available via the local metrics API, so it is always returned as null.
+     *
+     * @inheritDoc
+     */
+    public function status(): array
+    {
+        $context = stream_context_create([
+            'http' => [
+                'timeout'       => 2,
+                'ignore_errors' => true, // read body even on 4xx/5xx responses
+            ],
+        ]);
+
+        $raw = @file_get_contents('http://127.0.0.1:' . self::METRICS_PORT . '/ready', false, $context);
+
+        if ($raw === false) {
+            return ['running' => false, 'url' => null, 'connections' => null];
+        }
+
+        $data    = json_decode($raw, true);
+        $running = ($data['status'] ?? '') === 'ok';
+
+        return ['running' => $running, 'url' => null, 'connections' => null];
     }
 }

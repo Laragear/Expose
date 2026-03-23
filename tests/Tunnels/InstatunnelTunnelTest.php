@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\InstatunnelTunnel;
+use Tests\TestCase;
 
 /** Tests the InstatunnelTunnel implementation. */
 class InstatunnelTunnelTest extends TestCase
@@ -21,7 +21,7 @@ class InstatunnelTunnelTest extends TestCase
 
     public function test_name_is_instunnel(): void
     {
-        static::assertSame('InsTunnel', $this->tunnel->name());
+        static::assertSame('InstaTunnel', $this->tunnel->name());
     }
 
     public function test_binary_is_instatunnel(): void

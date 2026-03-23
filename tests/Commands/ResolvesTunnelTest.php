@@ -8,13 +8,13 @@ use Laragear\Expose\Commands\Concerns\ResolvesTunnel;
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Support\ComposerConfig;
 use Laragear\Expose\Support\TunnelRegistry;
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\AbstractTunnel;
 use RuntimeException;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
+use Tests\TestCase;
 
 /**
  * Tests the ResolvesTunnel trait in isolation via an anonymous consumer class.

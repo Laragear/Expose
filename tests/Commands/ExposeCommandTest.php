@@ -10,14 +10,14 @@ use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\Framework;
 use Laragear\Expose\Support\BinaryManager;
 use Laragear\Expose\Tunnels\AbstractTunnel;
-use stdClass;
-use Tests\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use ReflectionMethod;
+use stdClass;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
+use Tests\TestCase;
 
 /**
  * Tests ExposeCommand helper methods in isolation via reflection and mocks.

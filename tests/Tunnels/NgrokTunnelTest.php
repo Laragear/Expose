@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
-use Tests\TestCase;
 use Laragear\Expose\Tunnels\NgrokTunnel;
+use Tests\TestCase;
 
 /** Tests the NgrokTunnel implementation. */
 class NgrokTunnelTest extends TestCase
