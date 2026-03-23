@@ -1,8 +1,8 @@
 # Expose
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/laragear/expose.svg)](https://packagist.org/packages/laragear/expose)
 [![Latest stable test run](https://github.com/Laragear/Expose/actions/workflows/php.yml/badge.svg?branch=1.x)](https://github.com/Laragear/Expose/actions/workflows/php.yml)
-[![Codecov coverage](https://codecov.io/gh/Laragear/Expose/branch/1.x/graph/badge.svg?token=HIngrvQeOj)](https://codecov.io/gh/Laragear/Expose)
-[![CodeClimate Maintainability](https://api.codeclimate.com/v1/badges/{token}/maintainability)](https://codeclimate.com/github/Laragear/Expose/maintainability)
+[![Codecov coverage](https://codecov.io/gh/Laragear/Expose/graph/badge.svg?token=osWXSBfWq4)](https://codecov.io/gh/Laragear/Expose)
+[![Maintainability](https://qlty.sh/gh/Laragear/projects/Expose/maintainability.svg)](https://qlty.sh/gh/Laragear/projects/Expose)
 [![Sonarcloud Status](https://sonarcloud.io/api/project_badges/measure?project=Laragear_Expose&metric=alert_status)](https://sonarcloud.io/dashboard?id=Laragear_Expose)
 
 Expose your application to the Internet in one command
