@@ -86,7 +86,7 @@ class BinaryManager
         $process->run();
 
         if (!$process->isSuccessful()) {
-            throw new RuntimeException("Failed to download [{$binary}] from [{$url}]: ".$process->getErrorOutput());
+            throw new RuntimeException("Failed to download [$binary] from [$url]: ".$process->getErrorOutput());
         }
 
         if (PHP_OS_FAMILY !== 'Windows') {
@@ -104,7 +104,7 @@ class BinaryManager
         $process->run();
 
         if (!$process->isSuccessful()) {
-            throw new RuntimeException("Failed to install [{$package}] via NPM: ".$process->getErrorOutput());
+            throw new RuntimeException("Failed to install [$package] via NPM: ".$process->getErrorOutput());
         }
     }
 

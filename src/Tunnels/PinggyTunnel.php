@@ -129,6 +129,37 @@ class PinggyTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
+    public function status(): array
+    {
+        // Pinggy is entirely SSH-based: it has no local HTTP API, no management port,
+        // and creates no local listening socket (it uses SSH remote forwarding with -R).
+        // The only reliable way to detect an active session is to find the ssh process
+        // whose command line references the Pinggy server hostname.
+        //
+        // On Unix/macOS:  pgrep -f "a.pinggy.io" matches the ssh argument list.
+        // On Windows:     ssh.exe arguments are not visible via tasklist, so we fall back
+        //                 to checking for any running ssh.exe process as a best-effort
+        //                 proxy — the user is unlikely to have other simultaneous SSH
+        //                 sessions in a typical developer workflow.
+        //
+        // The public URL assigned by Pinggy (e.g. https://xxxxx.a.free.pinggy.link) is
+        // printed to stdout at session startup and is not recoverable afterwards, so it
+        // is always returned as null here.
+        if (PHP_OS_FAMILY === 'Windows') {
+            // On Windows, tasklist does not expose process arguments, so we can only
+            // check for any ssh.exe process as a best-effort indicator.
+            $running = $this->isProcessRunning('ssh.exe');
+        } else {
+            // Match on the Pinggy hostname appearing in the ssh command-line arguments.
+            $running = $this->isProcessRunning(self::SSH_SERVER);
+        }
+
+        return ['running' => $running, 'url' => null, 'connections' => null];
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function label(): string
     {
         return 'Pinggy (pinggy.io) [ssh-based]';

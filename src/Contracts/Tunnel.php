@@ -40,7 +40,7 @@ interface Tunnel
     /**
      * Returns the current status of the tunnel as an associative array.
      *
-     * @return array{running: bool, url: ?string, connections: int|null, error: ?string}
+     * @return array{running: bool, url: ?string, connections: int|null, error?: ?string}
      */
     public function status(): array;
 }
