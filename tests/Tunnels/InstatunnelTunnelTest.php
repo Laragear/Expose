@@ -21,7 +21,7 @@ class InstatunnelTunnelTest extends TestCase
 
     public function test_name_is_instunnel(): void
     {
-        static::assertSame('InsTunnel', $this->tunnel->name());
+        static::assertSame('InstaTunnel', $this->tunnel->name());
     }
 
     public function test_binary_is_instatunnel(): void
