@@ -9,10 +9,12 @@ use Laragear\Expose\Commands\Concerns\ResolvesTunnel;
 use Laragear\Expose\Contracts\InstallableTunnel;
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Support\ComposerConfig;
+use Laragear\Expose\Support\Option;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use function array_map;
 use const DIRECTORY_SEPARATOR;
 
 /**
@@ -74,33 +76,31 @@ class ConfigureCommand extends BaseCommand
      */
     protected function promptOptions(SymfonyStyle $io, Tunnel $tunnel): array
     {
-        $options = $tunnel->configurableOptions();
-
-        if (empty($options)) {
-            $io->note("{$tunnel->name()} has no configurable options.");
-
-            return [];
+        if ($options = $tunnel->configurableOptions()) {
+            return array_map(function (Option $option) use ($io): ?string {
+                return $this->promptSingleOption($io, $option);
+            }, $options);
         }
 
-        return array_map(function ($option) use ($io) {
-            return $this->promptSingleOption($io, $option);
-        }, $options);
+        $io->note("{$tunnel->name()} has no configurable options.");
+
+        return [];
     }
 
     /**
      * Prompts for a single option, hiding input when marked as a secret.
-     *
-     * @param  array{label: string, type?: "text"|"password"|"select", default: mixed|null, required: bool, hint?: string, options: string[], secret: bool}  $option
      */
-    protected function promptSingleOption(SymfonyStyle $io, array $option): ?string
+    protected function promptSingleOption(SymfonyStyle $io, Option $option): ?string
     {
-        if ($option['secret']) {
-            $value = $io->askHidden("{$option['label']} (leave blank to skip)");
-
-            return $value ?: null;
+        if ($option->isNotRequired()) {
+            return $option->default;
         }
 
-        return $io->ask($option['label'], $option['default']);
+        if ($option->isSecret) {
+            return $io->askHidden("$option->label (leave blank to skip)") ?: null;
+        }
+
+        return $io->ask($option->label, $option->default);
     }
 
     /**

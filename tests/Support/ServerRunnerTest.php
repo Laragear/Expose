@@ -89,7 +89,7 @@ class ServerRunnerTest extends TestCase
     }
 
     /** Builds a Process for native-server frameworks without starting it. */
-    private function makeNativeProcess(Framework $framework, string $host, int $port): Process
+    protected function makeNativeProcess(Framework $framework, string $host, int $port): Process
     {
         $command = str_replace(
             ['{host}', '{port}'],
@@ -101,7 +101,7 @@ class ServerRunnerTest extends TestCase
     }
 
     /** Builds a PHP built-in server Process without starting it. */
-    private function makeBuiltinProcess(Framework $framework, string $dir): Process
+    protected function makeBuiltinProcess(Framework $framework, string $dir): Process
     {
         $docRoot = $dir . DIRECTORY_SEPARATOR . $framework->publicDir();
 

@@ -20,7 +20,7 @@ class TunnelRegistryTest extends TestCase
     // -----------------------------------------------------------------------
 
     /** Builds a registry pointing at a temp dir with a minimal composer.json. */
-    private function makeRegistry(string $dir, array $expose = []): TunnelRegistry
+    protected function makeRegistry(string $dir, array $expose = []): TunnelRegistry
     {
         $data = ['name' => 'test/app', 'require' => new \stdClass()];
 
@@ -34,7 +34,7 @@ class TunnelRegistryTest extends TestCase
     }
 
     /** Writes a fake installed-package composer.json with an expose-tunnel declaration. */
-    private function writeFakePackage(string $vendorDir, string $vendor, string $name, array $definition): void
+    protected function writeFakePackage(string $vendorDir, string $vendor, string $name, array $definition): void
     {
         $packageDir = $vendorDir."/{$vendor}/{$name}";
         mkdir($packageDir, 0755, true);

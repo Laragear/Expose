@@ -41,14 +41,11 @@ class ListTunnelsCommand extends BaseCommand
     {
         $io = app(SymfonyStyle::class);
 
-        $config = app(ComposerConfig::class);
-        $registry = app(TunnelRegistry::class);
-        $activeTunnel = $config->get('tunnel');
-        $onlyInstalled = (bool) $input->getOption('installed');
+        $activeTunnel = app(ComposerConfig::class)->get('tunnel');
 
         $io->title('Available Tunnel Services');
 
-        $rows = $this->buildRows($registry, $activeTunnel, $onlyInstalled);
+        $rows = $this->buildRows(app(TunnelRegistry::class), $activeTunnel, (bool) $input->getOption('installed'));
 
         if (empty($rows)) {
             $io->note('No tunnel services found. Try removing the --installed filter.');
@@ -56,7 +53,7 @@ class ListTunnelsCommand extends BaseCommand
             return self::SUCCESS;
         }
 
-        $io->table(['Key', 'Label', 'Type', 'Binary', 'Installed', 'Active'], $rows,);
+        $io->table(['Key', 'Label', 'Type', 'Binary', 'Installed', 'Active'], $rows);
 
         $this->printHelp($io, $activeTunnel);
 

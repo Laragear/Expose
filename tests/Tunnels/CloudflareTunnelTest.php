@@ -10,7 +10,7 @@ use Tests\TestCase;
 /** Tests the CloudflareTunnel implementation. */
 class CloudflareTunnelTest extends TestCase
 {
-    private CloudflareTunnel $tunnel;
+    protected CloudflareTunnel $tunnel;
 
     protected function setUp(): void
     {

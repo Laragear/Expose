@@ -10,7 +10,7 @@ use Tests\TestCase;
 /** Tests the NgrokTunnel implementation. */
 class NgrokTunnelTest extends TestCase
 {
-    private NgrokTunnel $tunnel;
+    protected NgrokTunnel $tunnel;
 
     protected function setUp(): void
     {

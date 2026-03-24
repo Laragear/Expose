@@ -4,19 +4,42 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Tunnels\ZrokTunnel;
+use Mockery as m;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use function strtolower;
 
-/** Tests the ZrokTunnel implementation. */
+/**
+ * Tests the ZrokTunnel implementation.
+ */
 class ZrokTunnelTest extends TestCase
 {
-    private ZrokTunnel $tunnel;
+    protected ZrokTunnel $tunnel;
+
+    /** @var \Laragear\Expose\Support\BinaryManager&\Mockery\MockInterface  */
+    protected BinaryManager $binaryManager;
+
+    /** @var \Laragear\Expose\Support\ProcessFactory&\Mockery\MockInterface  */
+    protected ProcessFactory $processFactory;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->tunnel = new ZrokTunnel();
+        $this->tunnel = new ZrokTunnel(
+            $this->binaryManager = m::mock(BinaryManager::class),
+            $this->processFactory = m::mock(ProcessFactory::class),
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+        m::close();
     }
 
     public function test_name_is_zrok(): void
@@ -39,31 +62,40 @@ class ZrokTunnelTest extends TestCase
         static::assertNull($this->tunnel->npmPackageName());
     }
 
-    public function test_download_url_is_non_null_on_supported_platforms(): void
+    public static function providesArchAndOs(): iterable
     {
-        if (! in_array(PHP_OS_FAMILY, ['Linux', 'Darwin', 'Windows'], true)) {
-            $this->markTestSkipped('Platform not supported.');
-        }
+        $arch = ['arm64', 'amd64'];
+        $os = ['Windows', 'Linux', 'Darwin'];
 
-        static::assertNotNull($this->tunnel->downloadUrl());
+        return array_reduce($os, static function ($carry, $o) use ($arch): array {
+            return array_merge($carry, array_map(static function ($a) use ($o): array {
+                return [$o, $a];
+            }, $arch));
+        }, []);
     }
 
-    public function test_download_url_contains_zrok(): void
+    #[DataProvider('providesArchAndOs')]
+    public function test_download_url_is_non_null_on_supported_platforms(string $os, string $arch): void
     {
-        if (! in_array(PHP_OS_FAMILY, ['Linux', 'Darwin', 'Windows'], true)) {
-            $this->markTestSkipped('Platform not supported.');
-        }
+        $this->processFactory->expects('arch')->andReturn($arch);
+        $this->processFactory->expects('os')->andReturn($os);
 
-        static::assertStringContainsString('zrok', (string) $this->tunnel->downloadUrl());
+        $os = strtolower($os);
+
+        $extension = $os === 'windows' ? 'zip' : 'tar.gz';
+
+        static::assertSame(
+            "https://github.com/openziti/zrok/releases/latest/download/zrok_{$os}_$arch.$extension",
+            $this->tunnel->downloadUrl()
+        );
     }
 
-    public function test_download_url_reflects_arm64_architecture(): void
+    public function test_download_url_is_null_on_unsupported_platform(): void
     {
-        if (PHP_OS_FAMILY === 'Windows' || php_uname('m') !== 'arm64') {
-            $this->markTestSkipped('arm64 non-Windows only.');
-        }
+        $this->processFactory->expects('arch')->andReturn('amd64');
+        $this->processFactory->expects('os')->andReturn('invalid_is');
 
-        static::assertStringContainsString('arm64', (string) $this->tunnel->downloadUrl());
+        static::assertNull($this->tunnel->downloadUrl());
     }
 
     public function test_configurable_options_has_secret_token(): void

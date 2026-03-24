@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\Option;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
+use function json_decode;
 
 /**
  * Tunnel implementation for ngrok (ngrok.com).
@@ -39,9 +41,9 @@ class NgrokTunnel extends AbstractTunnel
     public function configurableOptions(): array
     {
         return [
-            'authtoken' => ['label' => 'ngrok Auth Token', 'default' => null, 'secret' => true],
-            'hostname'  => ['label' => 'Custom hostname (leave blank for random)', 'default' => null, 'secret' => false],
-            'region'    => ['label' => 'Region (us/eu/au/ap/sa/jp/in)', 'default' => 'us', 'secret' => false],
+            'authtoken' => Option::secret('ngrok Auth Token'),
+            'hostname' => Option::name('Custom hostname (leave blank for random)'),
+            'region' => Option::name('Region (us/eu/au/ap/sa/jp/in)', 'us'),
         ];
     }
 
@@ -50,7 +52,7 @@ class NgrokTunnel extends AbstractTunnel
      */
     public function configure(SymfonyStyle $io, array $values): void
     {
-        if (! empty($values['authtoken'])) {
+        if (!empty($values['authtoken'])) {
             $process = $this->buildProcess($this->binaryCommand(), 'config', 'add-authtoken')
                 ->args($values['authtoken'])
                 ->process();
@@ -78,20 +80,17 @@ class NgrokTunnel extends AbstractTunnel
      */
     public function status(): array
     {
-        $context = stream_context_create(['http' => ['timeout' => 2]]);
-        $raw = @file_get_contents('http://localhost:' . self::API_PORT . '/api/tunnels', false, $context);
+        $raw = $this->http->localGet(self::API_PORT, 'api/tunnels', false);
 
-        if ($raw === false) {
+        if ($raw === false || !$data = json_decode($raw, true)) {
             return ['running' => false, 'url' => null, 'connections' => null];
         }
-
-        $data = json_decode($raw, true);
 
         $url = $data['tunnels'][0]['public_url'] ?? null;
 
         return [
-            'running'     => $url !== null,
-            'url'         => $url,
+            'running' => $url !== null,
+            'url' => $url,
             'connections' => $data['tunnels'][0]['metrics']['conns']['count'] ?? null,
         ];
     }
@@ -113,11 +112,13 @@ class NgrokTunnel extends AbstractTunnel
      */
     protected function resolveDownloadUrl(): ?string
     {
-        return match (PHP_OS_FAMILY) {
-            'Linux'   => 'https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz',
-            'Darwin'  => 'https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip',
-            'Windows' => 'https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip',
-            default   => null,
+        $arch = $this->processFactory->arch() === 'arm64' ? 'arm64' : 'amd64';
+
+        return match ($this->processFactory->os()) {
+            'Linux' => "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-$arch.tgz",
+            'Darwin' => "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-$arch.zip",
+            'Windows' => "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-$arch.zip",
+            default => null,
         };
     }
 

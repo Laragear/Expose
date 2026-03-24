@@ -10,7 +10,7 @@ use Tests\TestCase;
 /** Tests the InstatunnelTunnel implementation. */
 class InstatunnelTunnelTest extends TestCase
 {
-    private InstatunnelTunnel $tunnel;
+    protected InstatunnelTunnel $tunnel;
 
     protected function setUp(): void
     {

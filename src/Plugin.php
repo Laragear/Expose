@@ -118,10 +118,10 @@ class Plugin implements PluginInterface, Capable, EventSubscriberInterface, Comm
             $container = Container::getInstance();
 
             $container->instance(InputInterface::class, $event->getInput());
-            $container->alias(get_class($event->getInput()), InputInterface::class);
+            $container->bind(InputInterface::class, get_class($event->getInput()));
 
             $container->instance(OutputInterface::class, $event->getOutput());
-            $container->alias(get_class($event->getOutput()), OutputInterface::class);
+            $container->bind(OutputInterface::class, get_class($event->getOutput()));
         }
     }
 }

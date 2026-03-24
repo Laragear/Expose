@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\Option;
 use Symfony\Component\Process\Process;
 
 /**
@@ -43,7 +44,7 @@ class LocaltunnelTunnel extends AbstractTunnel
     public function configurableOptions(): array
     {
         return [
-            'subdomain' => ['label' => 'Preferred subdomain (leave blank for random)', 'default' => null, 'secret' => false],
+            'subdomain' => Option::name('Preferred subdomain (leave blank for random)'),
         ];
     }
 

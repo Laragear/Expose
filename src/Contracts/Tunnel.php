@@ -21,13 +21,15 @@ interface Tunnel
 
     /**
      * Persists a single configuration value for this tunnel service.
+     *
+     * @param  array<string, \Laragear\Expose\Support\Option>  $values
      */
     public function configure(SymfonyStyle $io, array $values): void;
 
     /**
      * Returns all configurable options for this tunnel service.
      *
-     * @return array<string, array{label: string, type?: "text"|"password"|"select", default: mixed|null, required?: bool, hint?: string, options?: string[], secret: bool}>
+     * @return array<string, \Laragear\Expose\Support\Option>
      */
     public function configurableOptions(): array;
 

@@ -32,11 +32,19 @@ class ProcessFactory
     }
 
     /**
+     * Returns the current OS.
+     */
+    public function os(): string
+    {
+        return PHP_OS_FAMILY;
+    }
+
+    /**
      * Check if the current OS is Windows.
      */
     public function isWindows(): bool
     {
-        return PHP_OS_FAMILY === 'Windows';
+        return $this->os() === 'Windows';
     }
 
     /**
@@ -44,7 +52,15 @@ class ProcessFactory
      */
     public function isUnix(): bool
     {
-        return PHP_OS_FAMILY === 'Linux' || PHP_OS_FAMILY === 'Darwin';
+        return $this->os() === 'Linux' || $this->os() === 'Darwin';
+    }
+
+    /**
+     * Returns the architecture of the current os.
+     */
+    public function arch(): string
+    {
+        return php_uname('m');
     }
 
     /**
@@ -52,7 +68,7 @@ class ProcessFactory
      */
     public function isX86(): bool
     {
-        return in_array(strtolower(php_uname('m')), ['x86', 'i386', 'i686', 'amd64', 'x86-64', 'x64'], true);
+        return in_array(strtolower($this->arch()), ['x86', 'i386', 'i686', 'amd64', 'x86-64', 'x64'], true);
     }
 
     /**
@@ -60,7 +76,7 @@ class ProcessFactory
      */
     public function isArm(): bool
     {
-        $arch = strtolower(php_uname('m'));
+        $arch = strtolower($this->arch());
 
         return (str_contains($arch, 'arm') || str_contains($arch, 'aarch'));
     }

@@ -12,7 +12,7 @@ use Tests\TestCase;
 class AbstractTunnelTest extends TestCase
 {
     /** Returns a minimal concrete subclass of AbstractTunnel for testing. */
-    private function makeTunnel(array $overrides = []): AbstractTunnel
+    protected function makeTunnel(array $overrides = []): AbstractTunnel
     {
         return new class($overrides) extends AbstractTunnel {
             public function __construct(private readonly array $overrides = [])
@@ -75,7 +75,7 @@ class AbstractTunnelTest extends TestCase
     }
 
     /** Returns an npm-based concrete tunnel for testing npm paths. */
-    private function makeNpmTunnel(): AbstractTunnel
+    protected function makeNpmTunnel(): AbstractTunnel
     {
         return new class extends AbstractTunnel {
             protected bool $npmPackage = true;

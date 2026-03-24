@@ -39,10 +39,9 @@ class UpdateCommand extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = app(SymfonyStyle::class);
-        $config = app(ComposerConfig::class);
-        $force = (bool) $input->getOption('force');
 
-        $key = $this->requireSavedTunnelKey($config, $input->getOption('tunnel'));
+        $key = $this->requireSavedTunnelKey(app(ComposerConfig::class), $input->getOption('tunnel'));
+
         $tunnel = $this->registry()->make($key);
 
         if (!$tunnel instanceof InstallableTunnel) {
@@ -58,7 +57,7 @@ class UpdateCommand extends BaseCommand
         }
 
         $io->title("Updating {$tunnel->name()}...");
-        $tunnel->update($io, $force);
+        $tunnel->update($io, (bool) $input->getOption('force'));
         $io->success("{$tunnel->name()} is up to date.");
 
         return self::SUCCESS;

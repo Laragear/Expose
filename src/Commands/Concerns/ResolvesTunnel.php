@@ -35,9 +35,9 @@ trait ResolvesTunnel
     {
         $registry = $this->registry();
 
-        $key = $this->resolveTunnelKey($io, $config, $registry, $override);
-
-        return $registry->make($key);
+        return $registry->make(
+            $this->resolveTunnelKey($io, $config, $registry, $override)
+        );
     }
 
     /**

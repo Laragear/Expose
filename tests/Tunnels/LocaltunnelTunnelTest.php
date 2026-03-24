@@ -10,7 +10,7 @@ use Tests\TestCase;
 /** Tests the LocaltunnelTunnel implementation. */
 class LocaltunnelTunnelTest extends TestCase
 {
-    private LocaltunnelTunnel $tunnel;
+    protected LocaltunnelTunnel $tunnel;
 
     protected function setUp(): void
     {

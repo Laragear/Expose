@@ -27,7 +27,7 @@ class ExposeCommandTest extends TestCase
     /**
      * Returns an accessible ReflectionMethod for the given ExposeCommand method name.
      */
-    private function method(string $name): ReflectionMethod
+    protected function method(string $name): ReflectionMethod
     {
         return new ReflectionMethod(ExposeCommand::class, $name);
     }
@@ -35,7 +35,7 @@ class ExposeCommandTest extends TestCase
     /**
      * Builds a SymfonyStyle backed by a BufferedOutput for assertions.
      */
-    private function makeIo(): SymfonyStyle
+    protected function makeIo(): SymfonyStyle
     {
         return new SymfonyStyle(new ArrayInput([]), new BufferedOutput());
     }

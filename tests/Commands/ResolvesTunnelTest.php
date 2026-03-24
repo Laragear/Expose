@@ -24,7 +24,7 @@ class ResolvesTunnelTest extends TestCase
     /**
      * Builds a throwaway consumer of the trait bound to the given project root.
      */
-    private function consumer(string $projectRoot): object
+    protected function consumer(string $projectRoot): object
     {
         return new class($projectRoot) {
             use ResolvesTunnel;
@@ -62,7 +62,7 @@ class ResolvesTunnelTest extends TestCase
     /**
      * Builds a SymfonyStyle with a BufferedOutput for assertions.
      */
-    private function io(?BufferedOutput &$out = null): SymfonyStyle
+    protected function io(?BufferedOutput &$out = null): SymfonyStyle
     {
         $out = new BufferedOutput();
         return new SymfonyStyle(new ArrayInput([]), $out);
@@ -71,7 +71,7 @@ class ResolvesTunnelTest extends TestCase
     /**
      * Writes a minimal composer.json and returns a ComposerConfig for it.
      */
-    private function makeConfig(string $dir, array $expose = []): ComposerConfig
+    protected function makeConfig(string $dir, array $expose = []): ComposerConfig
     {
         $data = ['name' => 'test/app', 'require' => new \stdClass()];
 

@@ -6,6 +6,7 @@ namespace Laragear\Expose\Tunnels;
 
 use Laragear\Expose\Contracts\InstallableTunnel;
 use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Http;
 use Laragear\Expose\Support\PHP;
 use Laragear\Expose\Support\ProcessFactory;
 use RuntimeException;
@@ -31,8 +32,11 @@ abstract class AbstractTunnel implements InstallableTunnel
     /**
      * Create a new Abstract Tunnel instance.
      */
-    public function __construct(protected BinaryManager $binaryManager, protected ProcessFactory $processFactory)
-    {
+    public function __construct(
+        protected Http $http,
+        protected BinaryManager $binaryManager,
+        protected ProcessFactory $processFactory,
+    ) {
         //
     }
 
@@ -176,7 +180,7 @@ abstract class AbstractTunnel implements InstallableTunnel
      */
     protected function resolveDownloadUrl(): ?string
     {
-        throw new RuntimeException('No resolvable download URL was provided.');
+        return null;
     }
 
     /**

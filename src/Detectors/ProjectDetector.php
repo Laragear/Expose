@@ -6,7 +6,7 @@ namespace Laragear\Expose\Detectors;
 
 use Laragear\Expose\Enums\Framework;
 use Laragear\Expose\Support\File;
-use const DIRECTORY_SEPARATOR;
+use const DIRECTORY_SEPARATOR as DS;
 
 /**
  * Detects which PHP framework or platform the current project uses.
@@ -87,7 +87,7 @@ class ProjectDetector
      */
     protected function detectFromEnvFile(): ?Framework
     {
-        $envPath = $this->projectRoot.DIRECTORY_SEPARATOR.'.env';
+        $envPath = $this->projectRoot.DS.'.env';
 
         if ($this->file->missing($envPath)) {
             return null;
@@ -109,17 +109,17 @@ class ProjectDetector
      */
     protected function detectFromFilesystem(): ?Framework
     {
-        if ($this->file->exists($this->projectRoot.DIRECTORY_SEPARATOR.'wp-config.php')
-            || $this->file->exists($this->projectRoot.DIRECTORY_SEPARATOR.'wp-blog-header.php')) {
+        if ($this->file->exists($this->projectRoot.DS.'wp-config.php')
+            || $this->file->exists($this->projectRoot.DS.'wp-blog-header.php')) {
             return Framework::WordPress;
         }
 
-        if ($this->file->exists($this->projectRoot.DIRECTORY_SEPARATOR.'artisan')) {
+        if ($this->file->exists($this->projectRoot.DS.'artisan')) {
             return Framework::Laravel;
         }
 
-        if ($this->file->exists($this->projectRoot.DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'console')
-            && $this->file->exists($this->projectRoot.DIRECTORY_SEPARATOR.'config'.DIRECTORY_SEPARATOR.'bundles.php')) {
+        if ($this->file->exists($this->projectRoot.DS.'bin'.DS.'console')
+            && $this->file->exists($this->projectRoot.DS.'config'.DS.'bundles.php')) {
             return Framework::Symfony;
         }
 
@@ -169,7 +169,7 @@ class ProjectDetector
      */
     protected function readComposerJson(): ?array
     {
-        $path = $this->projectRoot.DIRECTORY_SEPARATOR.'composer.json';
+        $path = $this->projectRoot.DS.'composer.json';
 
         if ($this->file->missing($path)) {
             return null;

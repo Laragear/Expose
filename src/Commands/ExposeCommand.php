@@ -60,9 +60,9 @@ class ExposeCommand extends BaseCommand
         $io = app(SymfonyStyle::class);
         $host = (string) $input->getOption('host');
         $port = (int) $input->getOption('port');
-        $config = app(ComposerConfig::class);
         $framework = $this->detectFramework($io);
-        $tunnel = $this->resolveTunnel($io, $config, $input->getOption('tunnel'));
+
+        $tunnel = $this->resolveTunnel($io, app(ComposerConfig::class), $input->getOption('tunnel'));
 
         if (!$this->checkBinaryInstalled($io, $tunnel, app(BinaryManager::class))) {
             return self::FAILURE;

@@ -13,13 +13,13 @@ use Tests\TestCase;
 class ComposerConfigTest extends TestCase
 {
     /** Returns a minimal composer.json string with no extra block. */
-    private function minimalComposerJson(): string
+    protected function minimalComposerJson(): string
     {
         return json_encode(['name' => 'test/app', 'require' => new \stdClass()], JSON_PRETTY_PRINT);
     }
 
     /** Returns a composer.json string pre-seeded with expose config. */
-    private function seededComposerJson(array $expose): string
+    protected function seededComposerJson(array $expose): string
     {
         return json_encode(
             ['name' => 'test/app', 'extra' => ['expose' => $expose]],

@@ -39,9 +39,9 @@ class UninstallCommand extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = app(SymfonyStyle::class);
-        $config = app(ComposerConfig::class);
 
-        $key = $this->requireSavedTunnelKey($config, $input->getOption('tunnel'));
+        $key = $this->requireSavedTunnelKey(app(ComposerConfig::class), $input->getOption('tunnel'));
+
         $tunnel = $this->registry()->make($key);
 
         if (!$tunnel instanceof InstallableTunnel) {
@@ -66,7 +66,7 @@ class UninstallCommand extends BaseCommand
         $tunnel->uninstall($io);
 
         if ($input->getOption('purge')) {
-            $this->purgeComposerConfig($io, $config);
+            $this->purgeComposerConfig($io, app(ComposerConfig::class));
         }
 
         $io->success("{$tunnel->name()} has been uninstalled.");

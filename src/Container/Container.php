@@ -11,7 +11,7 @@ class Container extends BaseContainer
      */
     public static function getInstance(): static
     {
-        return static::$instance ?? new static();
+        return static::$instance ??= new static();
     }
 
     /**
@@ -19,6 +19,6 @@ class Container extends BaseContainer
      */
     public static function setInstance(?self $container = null): void
     {
-        static::$instance = $container;
+        static::$instance = $container ?? new static();
     }
 }

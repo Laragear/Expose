@@ -10,7 +10,7 @@ use Tests\TestCase;
 /** Tests the PinggyTunnel SSH-based implementation. */
 class PinggyTunnelTest extends TestCase
 {
-    private PinggyTunnel $tunnel;
+    protected PinggyTunnel $tunnel;
 
     protected function setUp(): void
     {

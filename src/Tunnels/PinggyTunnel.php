@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\Option;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
@@ -40,30 +40,6 @@ class PinggyTunnel extends AbstractTunnel
     }
 
     /**
-     * Pinggy uses the system SSH binary, so checking install means checking for `ssh`.
-     */
-    public function isInstalled(): bool
-    {
-        return (new ExecutableFinder())->find('ssh') !== null;
-    }
-
-    /**
-     * Pinggy is not distributed via NPM.
-     */
-    public function isInstallableViaNpm(): bool
-    {
-        return false;
-    }
-
-    /**
-     * Pinggy has no NPM package.
-     */
-    public function npmPackageName(): ?string
-    {
-        return null;
-    }
-
-    /**
      * Pinggy requires no binary download.
      */
     public function downloadUrl(): ?string
@@ -77,8 +53,8 @@ class PinggyTunnel extends AbstractTunnel
     public function configurableOptions(): array
     {
         return [
-            'token' => ['label' => 'Pinggy Access Token (optional)', 'default' => null, 'secret' => true],
-            'subdomain' => ['label' => 'Preferred subdomain (optional)', 'default' => null, 'secret' => false],
+            'token' => Option::secret('Pinggy Access Token (optional)')->optional(),
+            'subdomain' => Option::name('Preferred subdomain (optional)')->optional(),
         ];
     }
 
@@ -145,7 +121,7 @@ class PinggyTunnel extends AbstractTunnel
         // The public URL assigned by Pinggy (e.g. https://xxxxx.a.free.pinggy.link) is
         // printed to stdout at session startup and is not recoverable afterwards, so it
         // is always returned as null here.
-        if (PHP_OS_FAMILY === 'Windows') {
+        if ($this->processFactory->isWindows()) {
             // On Windows, tasklist does not expose process arguments, so we can only
             // check for any ssh.exe process as a best-effort indicator.
             $running = $this->isProcessRunning('ssh.exe');
