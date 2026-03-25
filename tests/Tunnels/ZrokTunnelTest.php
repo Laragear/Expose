@@ -91,7 +91,7 @@ class ZrokTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('token', $options);
-        static::assertTrue($options['token']['secret']);
+        static::assertTrue($options['token']->isSecret);
     }
 
     public function test_configurable_options_has_share_mode(): void
@@ -99,8 +99,8 @@ class ZrokTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('share_mode', $options);
-        static::assertSame('public', $options['share_mode']['default']);
-        static::assertFalse($options['share_mode']['secret']);
+        static::assertSame('public', $options['share_mode']->default);
+        static::assertFalse($options['share_mode']->isSecret);
     }
 
     public function test_default_status_is_not_running(): void
