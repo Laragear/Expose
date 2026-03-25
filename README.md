@@ -195,22 +195,6 @@ If you're a package author, you can also make your package a _tunnel-provider_ b
 }
 ```
 
-## Configuration
-
-You can publish the configuration through `vendor:publish`:
-
-```shell
-php artisan vendor:publish --provider="Laragear\Expose\ExposeServiceProvider" --tag="config"
-```
-
-You should receive a file with an array like this:
-
-```php
-return [
-    // ...
-]
-```
-
 ## Security
 
 If you discover any security-related issues, issue a [Security Advisory](https://github.com/Laragear/Expose/security/advisories/new).
