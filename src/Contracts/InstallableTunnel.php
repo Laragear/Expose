@@ -10,7 +10,7 @@ interface InstallableTunnel extends Tunnel
     /**
      * Installs the tunnel binaries.
      *
-     * @return bool "true" if it was installed, "false" if was already installed.
+     * @return bool "true" if it was installed or was already installed, "false" otherwise.
      */
     public function install(BinaryManager $manager, SymfonyStyle $io): bool;
 
@@ -37,10 +37,10 @@ interface InstallableTunnel extends Tunnel
     /**
      * Updates the tunnel binary to the latest version, optionally forcing a full reinstall.
      */
-    public function update(SymfonyStyle $io, bool $force = false): void;
+    public function update(BinaryManager $manager, SymfonyStyle $io, bool $force = false): void;
 
     /**
      * Uninstalls the tunnel binary from the system.
      */
-    public function uninstall(SymfonyStyle $io): void;
+    public function uninstall(BinaryManager $manager, SymfonyStyle $io): void;
 }

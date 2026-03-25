@@ -6,141 +6,185 @@ namespace Tests\Detectors;
 
 use Laragear\Expose\Detectors\ProjectDetector;
 use Laragear\Expose\Enums\Framework;
+use Laragear\Expose\Support\File;
+use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use function file_get_contents;
+use function json_encode;
+use const FILE_IGNORE_NEW_LINES;
+use const FILE_SKIP_EMPTY_LINES;
 
-/** Tests that ProjectDetector correctly identifies PHP frameworks. */
 class ProjectDetectorTest extends TestCase
 {
-    /** Returns detection test cases as [fixture, expected Framework]. */
+    protected File&MockInterface $file;
+    protected ProjectDetector $detector;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->file = $this->mock(File::class);
+
+        $this->detector = new ProjectDetector($this->file, '/app');
+    }
+
     public static function composerPackageProvider(): array
     {
         return [
-            'Laravel via composer.json'  => ['composer-laravel.json', Framework::Laravel],
-            'Lumen via composer.json'    => ['composer-lumen.json', Framework::Lumen],
-            'Symfony via composer.json'  => ['composer-symfony.json', Framework::Symfony],
-            'CakePHP via composer.json'  => ['composer-cakephp.json', Framework::CakePHP],
-            'Yii via composer.json'      => ['composer-yii.json', Framework::Yii],
+            'Laravel via composer.json' => ['composer-laravel.json', Framework::Laravel],
+            'Lumen via composer.json' => ['composer-lumen.json', Framework::Lumen],
+            'Symfony via composer.json' => ['composer-symfony.json', Framework::Symfony],
+            'CakePHP via composer.json' => ['composer-cakephp.json', Framework::CakePHP],
+            'Yii via composer.json' => ['composer-yii.json', Framework::Yii],
         ];
     }
 
     #[DataProvider('composerPackageProvider')]
-    public function test_detects_framework_from_composer_json(
-        string $fixture,
-        Framework $expected,
-    ): void {
-        $this->withTempDir(function (string $dir) use ($fixture, $expected): void {
-            copy($this->fixturesPath($fixture), $dir . '/composer.json');
+    public function test_detects_framework_from_composer_json(string $fixture, Framework $expected): void
+    {
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(
+            file_get_contents($this->fixturesPath($fixture)),
+        );
 
-            $framework = (new ProjectDetector($dir))->detect();
+        $framework = $this->detector->detect();
 
-            static::assertSame($expected, $framework);
-        });
+        static::assertSame($expected, $framework);
     }
 
     public function test_detects_laravel_from_env_file(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            copy($this->fixturesPath('env-laravel'), $dir . '/.env');
-            $this->writeFile($dir, 'composer.json', '{"require":{}}');
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(json_encode(['require' => []]));
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
+            ->andReturn((new File())->lines($this->fixturesPath('/env-laravel')));
 
-            $framework = (new ProjectDetector($dir))->detect();
+        $framework = $this->detector->detect();
 
-            static::assertSame(Framework::Laravel, $framework);
-        });
+        static::assertSame(Framework::Laravel, $framework);
     }
 
     public function test_detects_wordpress_from_env_file(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            copy($this->fixturesPath('env-wordpress'), $dir . '/.env');
-            $this->writeFile($dir, 'composer.json', '{"require":{}}');
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(json_encode(['require' => []]));
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
+            ->andReturn((new File())->lines($this->fixturesPath('/env-wordpress')));
 
-            $framework = (new ProjectDetector($dir))->detect();
+        $framework = $this->detector->detect();
 
-            static::assertSame(Framework::WordPress, $framework);
-        });
-    }
-
-    public function test_detects_laravel_from_artisan_file(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $this->writeFile($dir, 'composer.json', '{"require":{}}');
-            $this->writeFile($dir, 'artisan', '<?php // artisan stub');
-
-            $framework = (new ProjectDetector($dir))->detect();
-
-            static::assertSame(Framework::Laravel, $framework);
-        });
+        static::assertSame(Framework::WordPress, $framework);
     }
 
     public function test_detects_wordpress_from_wp_config(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $this->writeFile($dir, 'composer.json', '{"require":{}}');
-            $this->writeFile($dir, 'wp-config.php', '<?php // wp stub');
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(json_encode(['require' => []]));
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)->andReturn([]);
+        $this->file->expects('exists')->with('/app/wp-config.php')->andReturnTrue();
 
-            $framework = (new ProjectDetector($dir))->detect();
+        $framework = $this->detector->detect();
 
-            static::assertSame(Framework::WordPress, $framework);
-        });
+        static::assertSame(Framework::WordPress, $framework);
+    }
+
+    public function test_detects_wordpress_from_wp_blog_header(): void
+    {
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(json_encode(['require' => []]));
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)->andReturn([]);
+        $this->file->expects('exists')->with('/app/wp-config.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/wp-blog-header.php')->andReturnTrue();
+
+        $framework = $this->detector->detect();
+
+        static::assertSame(Framework::WordPress, $framework);
+    }
+
+    public function test_detects_laravel_from_artisan_file(): void
+    {
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(json_encode(['require' => []]));
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)->andReturn([]);
+        $this->file->expects('exists')->with('/app/wp-config.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/wp-blog-header.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/artisan')->andReturnTrue();
+
+        $framework = $this->detector->detect();
+
+        static::assertSame(Framework::Laravel, $framework);
     }
 
     public function test_detects_symfony_from_filesystem(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $this->writeFile($dir, 'composer.json', '{"require":{}}');
-            $this->writeFile($dir, 'bin/console', '#!/usr/bin/env php');
-            $this->writeFile($dir, 'config/bundles.php', '<?php return [];');
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(json_encode(['require' => []]));
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)->andReturn([]);
+        $this->file->expects('exists')->with('/app/wp-config.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/wp-blog-header.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/artisan')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/bin/console')->andReturnTrue();
+        $this->file->expects('exists')->with('/app/config/bundles.php')->andReturnTrue();
 
-            $framework = (new ProjectDetector($dir))->detect();
+        $framework = $this->detector->detect();
 
-            static::assertSame(Framework::Symfony, $framework);
-        });
+        static::assertSame(Framework::Symfony, $framework);
     }
 
     public function test_falls_back_to_unknown_when_nothing_matches(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $this->writeFile($dir, 'composer.json', '{"require":{}}');
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(json_encode(['require' => []]));
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)->andReturn([]);
+        $this->file->expects('exists')->with('/app/wp-config.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/wp-blog-header.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/artisan')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/bin/console')->andReturnTrue();
+        $this->file->expects('exists')->with('/app/config/bundles.php')->andReturnFalse();
 
-            $framework = (new ProjectDetector($dir))->detect();
+        $framework = $this->detector->detect();
 
-            static::assertSame(Framework::Unknown, $framework);
-        });
-    }
-
-    public function test_composer_json_takes_priority_over_env_file(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            // composer.json says Symfony, .env says Laravel — composer wins
-            copy($this->fixturesPath('composer-symfony.json'), $dir . '/composer.json');
-            copy($this->fixturesPath('env-laravel'), $dir . '/.env');
-
-            $framework = (new ProjectDetector($dir))->detect();
-
-            static::assertSame(Framework::Symfony, $framework);
-        });
+        static::assertSame(Framework::Unknown, $framework);
     }
 
     public function test_handles_missing_composer_json_gracefully(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            // No composer.json at all — should not throw, fall back to Unknown
-            $framework = (new ProjectDetector($dir))->detect();
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnTrue();
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)->andReturn([]);
+        $this->file->expects('exists')->with('/app/wp-config.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/wp-blog-header.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/artisan')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/bin/console')->andReturnTrue();
+        $this->file->expects('exists')->with('/app/config/bundles.php')->andReturnFalse();
 
-            static::assertSame(Framework::Unknown, $framework);
-        });
+        $framework = $this->detector->detect();
+
+        static::assertSame(Framework::Unknown, $framework);
     }
 
     public function test_handles_malformed_composer_json_gracefully(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $this->writeFile($dir, 'composer.json', 'NOT VALID JSON {{{');
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn('INVALID-JSON');
+        $this->file->expects('missing')->with('/app/.env')->andReturnFalse();
+        $this->file->expects('lines')->with('/app/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)->andReturn([]);
+        $this->file->expects('exists')->with('/app/wp-config.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/wp-blog-header.php')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/artisan')->andReturnFalse();
+        $this->file->expects('exists')->with('/app/bin/console')->andReturnTrue();
+        $this->file->expects('exists')->with('/app/config/bundles.php')->andReturnFalse();
 
-            $framework = (new ProjectDetector($dir))->detect();
+        $framework = $this->detector->detect();
 
-            static::assertSame(Framework::Unknown, $framework);
-        });
+        static::assertSame(Framework::Unknown, $framework);
     }
 }

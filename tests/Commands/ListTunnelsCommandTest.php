@@ -1,159 +1,169 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Tests\Commands;
 
 use Laragear\Expose\Commands\ListTunnelsCommand;
+use Laragear\Expose\Contracts\InstallableTunnel;
+use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\TunnelService;
+use Laragear\Expose\Support\ComposerConfig;
+use Laragear\Expose\Support\TunnelRegistry;
 use Laragear\Expose\Tunnels\AbstractTunnel;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Process\Process;
+use Mockery;
+use Mockery\MockInterface;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
+use Tests\TestCase;
 
-/** Tests ListTunnelsCommand table output and filtering. */
-class ListTunnelsCommandTest extends CommandTestCase
+class ListTunnelsCommandTest extends TestCase
 {
-    protected function makeCommand(): Command
+    protected ListTunnelsCommand $command;
+
+    protected function setUp(): void
     {
-        return new ListTunnelsCommand();
+        parent::setUp();
+
+        $this->command = new ListTunnelsCommand();
     }
 
-    public function test_exits_successfully(): void
+    public function test_command_configuration(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir);
+        static::assertSame('expose:list', $this->command->getName());
+        static::assertSame(
+            'List all available tunnel services, including custom and package-provided ones.',
+            $this->command->getDescription(),
+        );
 
-            static::assertSame(Command::SUCCESS, $this->runAndGetTester()->getStatusCode());
-        });
+        static::assertCount(1, $this->command->getDefinition()->getOptions());
+
+        $optionTunnel = $this->command->getDefinition()->getOption('installed');
+
+        static::assertSame('installed', $optionTunnel->getName());
+        static::assertSame('i', $optionTunnel->getShortcut());
+        static::assertFalse($optionTunnel->getDefault());
+        static::assertSame('Show only services whose binary is currently installed.', $optionTunnel->getDescription());
     }
 
-    public function test_output_contains_all_built_in_service_keys(): void
+    public function test_list_all_tunnels(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir);
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('bar');
 
-            $output = $this->runAndGetTester([], ['decorated' => false])->getDisplay();
-
-            foreach (TunnelService::cases() as $service) {
-                static::assertStringContainsString($service->value, $output);
-            }
-        });
-    }
-
-    public function test_output_marks_active_tunnel(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir, ['tunnel' => 'ngrok']);
-
-            $output = $this->runAndGetTester([], ['decorated' => false])->getDisplay();
-
-            // The active marker check symbol should appear somewhere in the ngrok row.
-            static::assertStringContainsString('YES', $output);
-        });
-    }
-
-    public function test_output_labels_built_ins_as_built_in(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir);
-
-            $output = $this->runAndGetTester([], ['decorated' => false])->getDisplay();
-
-            static::assertStringContainsString('built-in', $output);
-        });
-    }
-
-    public function test_custom_tunnel_appears_with_custom_label(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir, [
-                'tunnels' => [
-                    'fake-ext' => [
-                        'label' => 'Fake Extension Tunnel',
-                        'class' => FakeExtTunnel::class,
-                    ],
-                ],
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('title')->with('Available Tunnel Services');
+            $mock->expects('table')->with(['Key', 'Label', 'Type', 'Binary', 'Installed', 'Active'], [
+                ['foo', 'foo', '<fg=cyan>custom</>', 'unknown binary', '<comment>no</comment>', ''],
+                ['bar', 'bar', '<fg=cyan>custom</>', 'bar-binary', '<info>yes</info>', '<info>YES</info>'],
+                ['baz', 'baz', '<fg=cyan>custom</>', 'unknown binary', '<comment>no</comment>', ''],
+                ['cloudflare', 'cloudflare', 'built-in', 'unknown binary', '<comment>no</comment>', ''],
             ]);
-
-            $output = $this->runAndGetTester([], ['decorated' => false])->getDisplay();
-
-            static::assertStringContainsString('fake-ext', $output);
-            static::assertStringContainsString('Fake Extension Tunnel', $output);
-            static::assertStringContainsString('custom', $output);
+            $mock->expects('note')->with(
+                'Active tunnel: <info>bar</info>. Change it with: composer expose:configure --reset',
+            );
         });
-    }
 
-    public function test_installed_filter_hides_uninstalled_services(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir);
+        $foo = Mockery::mock(InstallableTunnel::class);
+        $foo->expects('isInstalled')->andReturnFalse();
+        $foo->expects('name')->andReturn('foo');
+        $bar = Mockery::mock(AbstractTunnel::class);
+        $bar->expects('isInstalled')->andReturnTrue();
+        $bar->expects('binary')->andReturn('bar-binary');
+        $bar->expects('name')->andReturn('bar');
+        $baz = Mockery::mock(Tunnel::class);
+        $baz->expects('name')->andReturn('baz');
+        $qux = Mockery::mock(InstallableTunnel::class);
+        $qux->expects('isInstalled')->andReturnFalse();
+        $qux->expects('name')->andReturn(TunnelService::Cloudflare->value);
 
-            // All built-in binaries are almost certainly absent in CI.
-            // With --installed, the table should be empty or print only SSH-based Pinggy if ssh exists.
-            $tester = $this->runAndGetTester(['--installed' => true], ['decorated' => false]);
-            $output = $tester->getDisplay();
+        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($qux, $baz, $bar, $foo): void {
+            $mock->expects('keys')->andReturn(['foo', 'bar', 'baz', TunnelService::Cloudflare->value]);
 
-            // At minimum, none of the binary-based services should appear.
-            static::assertStringNotContainsString('ngrok', $output);
-            static::assertStringNotContainsString('cloudflared', $output);
-            static::assertStringNotContainsString('zrok', $output);
+            $mock->expects('make')->with('foo')->andReturn($foo);
+            $mock->expects('make')->with('bar')->andReturn($bar);
+            $mock->expects('make')->with('baz')->andReturn($baz);
+            $mock->expects('make')->with(TunnelService::Cloudflare->value)->andReturn($qux);
         });
+
+        static::assertSame(ListTunnelsCommand::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
-    public function test_note_shown_when_no_tunnel_configured(): void
+    public function test_lists_no_tunnels_if_empty(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir);
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('bar');
 
-            $output = $this->runAndGetTester([], ['decorated' => false])->getDisplay();
-
-            static::assertStringContainsString('No tunnel configured', $output);
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('title')->with('Available Tunnel Services');
+            $mock->expects('note')->with(
+                'No tunnel services found. Try removing the --installed filter.',
+            );
         });
+
+        $this->mock(TunnelRegistry::class)->expects('keys')->andReturn([]);
+
+        static::assertSame(ListTunnelsCommand::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
-    public function test_note_shows_active_tunnel_when_configured(): void
+    public function test_shows_no_active_tunnel(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir, ['tunnel' => 'zrok']);
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturnNull();
 
-            $output = $this->runAndGetTester([], ['decorated' => false])->getDisplay();
-
-            static::assertStringContainsString('Active tunnel: <info>zrok</info>', $output);
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('title')->with('Available Tunnel Services');
+            $mock->expects('table')->withAnyArgs();
+            $mock->expects('note')->with(
+                'Active tunnel: <info>bar</info>. Change it with: composer expose:configure --reset',
+            )->never();
+            $mock->expects('note')->with('No tunnel configured yet. Run `composer expose` to choose one.');
         });
-    }
-}
 
-/** Minimal concrete tunnel used only in list command tests. */
-class FakeExtTunnel extends AbstractTunnel
-{
-    public function name(): string
-    {
-        return 'Fake Extension Tunnel';
-    }
+        $foo = Mockery::mock(InstallableTunnel::class);
+        $foo->expects('isInstalled')->andReturnFalse();
+        $foo->expects('name')->andReturn('foo');
 
-    public function binary(): string
-    {
-        return 'fake-ext';
+        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($foo): void {
+            $mock->expects('keys')->andReturn(['foo']);
+            $mock->expects('make')->with('foo')->andReturn($foo);
+        });
+
+        static::assertSame(ListTunnelsCommand::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function test_list_only_installed(): void
     {
-        return $this->buildProcess(['echo', 'fake']);
-    }
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('bar');
 
-    /**
-     * @inheritDoc
-     */
-    public function label(): string
-    {
-        return 'test-tunnel';
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('title')->with('Available Tunnel Services');
+            $mock->expects('table')->with(['Key', 'Label', 'Type', 'Binary', 'Installed', 'Active'], [
+                ['bar', 'bar', '<fg=cyan>custom</>', 'bar-binary', '<info>yes</info>', '<info>YES</info>'],
+            ]);
+            $mock->expects('note')->with(
+                'Active tunnel: <info>bar</info>. Change it with: composer expose:configure --reset',
+            );
+        });
+
+        $foo = Mockery::mock(InstallableTunnel::class);
+        $foo->expects('isInstalled')->andReturnFalse();
+        $bar = Mockery::mock(AbstractTunnel::class);
+        $bar->expects('isInstalled')->andReturnTrue();
+        $bar->expects('binary')->andReturn('bar-binary');
+        $bar->expects('name')->andReturn('bar');
+        $baz = Mockery::mock(Tunnel::class);
+        $qux = Mockery::mock(InstallableTunnel::class);
+        $qux->expects('isInstalled')->andReturnFalse();
+
+        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($qux, $baz, $bar, $foo): void {
+            $mock->expects('keys')->andReturn(['foo', 'bar', 'baz', TunnelService::Cloudflare->value]);
+
+            $mock->expects('make')->with('foo')->andReturn($foo);
+            $mock->expects('make')->with('bar')->andReturn($bar);
+            $mock->expects('make')->with('baz')->andReturn($baz);
+            $mock->expects('make')->with(TunnelService::Cloudflare->value)->andReturn($qux);
+        });
+
+        static::assertSame(
+            ListTunnelsCommand::SUCCESS,
+            $this->command->run(new ArrayInput(['--installed' => true]), new NullOutput())
+        );
     }
 }

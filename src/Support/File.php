@@ -10,6 +10,7 @@ use function chmod;
 use function file;
 use function file_exists;
 use function file_get_contents;
+use function glob;
 
 class File
 {
@@ -88,8 +89,16 @@ class File
     /**
      * Returns the contents of a file as an array of lines
      */
-    public function lines(string $path, int $param): array|false
+    public function lines(string $path, int $param = 0): array|false
     {
         return file($path, $param);
+    }
+
+    /**
+     * Find path names matching a pattern.
+     */
+    public function glob(string $string): array|false
+    {
+        return glob($string);
     }
 }

@@ -7,6 +7,7 @@ namespace Laragear\Expose\Support;
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\TunnelService;
 use RuntimeException;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use function app;
 use function array_column;
 use function array_combine;
@@ -49,9 +50,7 @@ class TunnelRegistry
      *
      * @param  string  $projectRoot  The absolute path to the project root (where composer.json lives).
      */
-    public function __construct(
-        protected File $file,
-        protected readonly string $projectRoot)
+    public function __construct(protected File $file, protected readonly string $projectRoot)
     {
         $this->loadBuiltIns();
         $this->loadFromProjectComposerJson();
@@ -81,7 +80,7 @@ class TunnelRegistry
      */
     public function missing(string $key): bool
     {
-        return ! $this->has($key);
+        return !$this->has($key);
     }
 
     /**
@@ -99,15 +98,7 @@ class TunnelRegistry
             throw new RuntimeException("The Tunnel Service [$key] does not have a valid class.");
         }
 
-        $class = $this->tunnels[$key]['class'];
-
-        $container = app();
-
-        if (method_exists($class, 'withContainer')) {
-            $class->withContainer($container);
-        }
-
-        return $container->make($class);
+        return app()->make($this->tunnels[$key]['class']);
     }
 
     /**
@@ -196,7 +187,7 @@ class TunnelRegistry
     {
         $vendorDir = $this->projectRoot.DS.'vendor';
 
-        if (!is_dir($vendorDir)) {
+        if ($this->file->isNotDir($vendorDir)) {
             return;
         }
 
@@ -209,11 +200,13 @@ class TunnelRegistry
                 continue;
             }
 
-            $this->registerFromDefinition(
-                (string) $definition['key'],
-                $definition,
-                (string) $path,
-            );
+            try {
+                $this->registerFromDefinition((string) $definition['key'], $definition, (string) $path);
+            } catch (RuntimeException $e) {
+                if (app()->bound(SymfonyStyle::class)) {
+                    app(SymfonyStyle::class)->warning($e->getMessage());
+                }
+            }
         }
     }
 
@@ -240,7 +233,7 @@ class TunnelRegistry
      */
     protected function vendorComposerJsonPaths(string $vendorDir): iterable
     {
-        foreach (glob($vendorDir.DS.'*'.DS.'*'.DS.'composer.json') ?: [] as $path) {
+        foreach ($this->file->glob($vendorDir.DS.'*'.DS.'*'.DS.'composer.json') ?: [] as $path) {
             yield $path;
         }
     }

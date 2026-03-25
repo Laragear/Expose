@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Tunnels;
 
 use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Http;
 use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Tunnels\ZrokTunnel;
 use Mockery as m;
@@ -19,10 +20,8 @@ class ZrokTunnelTest extends TestCase
 {
     protected ZrokTunnel $tunnel;
 
-    /** @var \Laragear\Expose\Support\BinaryManager&\Mockery\MockInterface  */
+    protected Http&m\MockInterface $http;
     protected BinaryManager $binaryManager;
-
-    /** @var \Laragear\Expose\Support\ProcessFactory&\Mockery\MockInterface  */
     protected ProcessFactory $processFactory;
 
     protected function setUp(): void
@@ -30,6 +29,7 @@ class ZrokTunnelTest extends TestCase
         parent::setUp();
 
         $this->tunnel = new ZrokTunnel(
+            $this->http = m::mock(Http::class),
             $this->binaryManager = m::mock(BinaryManager::class),
             $this->processFactory = m::mock(ProcessFactory::class),
         );
@@ -60,18 +60,6 @@ class ZrokTunnelTest extends TestCase
     public function test_npm_package_name_is_null(): void
     {
         static::assertNull($this->tunnel->npmPackageName());
-    }
-
-    public static function providesArchAndOs(): iterable
-    {
-        $arch = ['arm64', 'amd64'];
-        $os = ['Windows', 'Linux', 'Darwin'];
-
-        return array_reduce($os, static function ($carry, $o) use ($arch): array {
-            return array_merge($carry, array_map(static function ($a) use ($o): array {
-                return [$o, $a];
-            }, $arch));
-        }, []);
     }
 
     #[DataProvider('providesArchAndOs')]
@@ -117,6 +105,8 @@ class ZrokTunnelTest extends TestCase
 
     public function test_default_status_is_not_running(): void
     {
+        $this->http->expects('localGet')->with(9191, '/api/v1/overview')->andReturnFalse();
+
         $status = $this->tunnel->status();
 
         static::assertFalse($status['running']);

@@ -5,29 +5,27 @@ declare(strict_types=1);
 namespace Laragear\Expose\Commands;
 
 use Composer\Command\BaseCommand;
-use Laragear\Expose\Commands\Concerns\ResolvesTunnel;
 use Laragear\Expose\Contracts\InstallableTunnel;
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Detectors\ProjectDetector;
 use Laragear\Expose\Enums\Framework;
-use Laragear\Expose\Support\BinaryManager;
-use Laragear\Expose\Support\ComposerConfig;
-use Laragear\Expose\Support\ProcessFactory;
+use Laragear\Expose\NpmInstaller\BinaryInstaller;
+use Laragear\Expose\NpmInstaller\NpmInstaller;
+use Laragear\Expose\Support\Date;
 use Laragear\Expose\Support\ServerRunner;
+use Laragear\Expose\Support\TunnelRunner;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 use function app;
-use const DIRECTORY_SEPARATOR;
 
 /**
  * Exposes the local project to the internet using the configured tunnel service.
  */
 class ExposeCommand extends BaseCommand
 {
-    use ResolvesTunnel;
+    use Concerns\ResolvesServices;
 
     /**
      * The default host to bind the local server to.
@@ -57,23 +55,22 @@ class ExposeCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = app(SymfonyStyle::class);
         $host = (string) $input->getOption('host');
         $port = (int) $input->getOption('port');
-        $framework = $this->detectFramework($io);
+        $framework = $this->detectFramework();
 
-        $tunnel = $this->resolveTunnel($io, app(ComposerConfig::class), $input->getOption('tunnel'));
+        $tunnel = $this->resolveTunnel($input->getOption('tunnel'));
 
-        if (!$this->checkBinaryInstalled($io, $tunnel, app(BinaryManager::class))) {
+        if (!$this->checkBinaryInstalled($tunnel)) {
             return self::FAILURE;
         }
 
-        $io->section("Starting {$framework->label()} project on http://$host:$port");
+        $this->io()->section("Starting {$framework->label()} project on http://$host:$port");
 
-        $serverProcess = $this->startServer($io, $framework, $host, $port);
-        $tunnelProcess = $this->startTunnel($io, $tunnel, $host, $port);
+        $serverProcess = $this->startServer($framework, $host, $port);
+        $tunnelProcess = $this->startTunnel($tunnel, $host, $port);
 
-        $this->waitForShutdown($io, $serverProcess, $tunnelProcess);
+        $this->waitForShutdown($serverProcess, $tunnelProcess);
 
         return self::SUCCESS;
     }
@@ -81,11 +78,11 @@ class ExposeCommand extends BaseCommand
     /**
      * Detects the framework and prints the result to the console.
      */
-    protected function detectFramework(SymfonyStyle $io): Framework
+    protected function detectFramework(): Framework
     {
         $framework = app(ProjectDetector::class)->detect();
 
-        $io->text("Detected project: <info>{$framework->label()}</info>");
+        $this->io()->text("Detected project: <info>{$framework->label()}</info>");
 
         return $framework;
     }
@@ -93,10 +90,10 @@ class ExposeCommand extends BaseCommand
     /**
      * Verifies the tunnel binary is installed, guiding the user if it is not.
      */
-    protected function checkBinaryInstalled(SymfonyStyle $io, Tunnel $tunnel, BinaryManager $manager): bool
+    protected function checkBinaryInstalled(Tunnel $tunnel): bool
     {
         if (!$tunnel instanceof InstallableTunnel) {
-            $io->info("Tunnel [{$tunnel->name()}] may not be installed.");
+            $this->io()->info("Tunnel [{$tunnel->name()}] may not be installed.");
 
             return true;
         }
@@ -106,65 +103,18 @@ class ExposeCommand extends BaseCommand
         }
 
         return $tunnel->isInstallableViaNpm()
-            ? $this->handleMissingNpmBinary($io, $tunnel, $manager)
-            : $this->handleMissingDownloadBinary($io, $tunnel, $manager);
-    }
-
-    /**
-     * Handles the case where an NPM-based tunnel binary is missing.
-     */
-    protected function handleMissingNpmBinary(SymfonyStyle $io, InstallableTunnel $tunnel, BinaryManager $manager): bool
-    {
-        $package = $tunnel->npmPackageName();
-
-        $io->warning("{$tunnel->name()} is not installed. It is available as the NPM package `{$package}`.");
-
-        if (!$manager->isNpmAvailable()) {
-            $io->error('NPM is not installed. Please install Node.js and NPM first, then run: npm install -g '.$package);
-
-            return false;
-        }
-
-        $choice = $io->choice(
-            'What would you like to do?',
-            [
-                'install' => "Install `$package` via NPM now",
-                'manual' => 'I will install it manually and retry',
-            ],
-        );
-
-        if ($choice === 'manual') {
-            $io->text("Run this command, then try again: <comment>npm install -g $package</comment>");
-
-            return false;
-        }
-
-        $manager->installViaNpm((string) $package);
-
-        $io->success("{$tunnel->name()} installed.");
-
-        return true;
-    }
-
-    /**
-     * Handles the case where a cURL-downloaded tunnel binary is missing.
-     */
-    protected function handleMissingDownloadBinary(
-        SymfonyStyle $io,
-        InstallableTunnel $tunnel,
-        BinaryManager $manager,
-    ): bool {
-        return $tunnel->install($manager, $io);
+            ? app(NpmInstaller::class)->install($tunnel)
+            : app(BinaryInstaller::class)->install($tunnel);
     }
 
     /**
      * Starts the local PHP development server.
      */
-    protected function startServer(SymfonyStyle $io, Framework $framework, string $host, int $port): Process
+    protected function startServer(Framework $framework, string $host, int $port): Process
     {
         $process = app(ServerRunner::class)->start($framework, $host, $port);
 
-        $io->text('Local server started. Waiting for tunnel URL...');
+        $this->io()->text('Local server started. Waiting for tunnel...');
 
         return $process;
     }
@@ -172,53 +122,13 @@ class ExposeCommand extends BaseCommand
     /**
      * Starts the tunnel and prints the public URL once available.
      */
-    protected function startTunnel(SymfonyStyle $io, Tunnel $tunnel, string $host, int $port): Process
+    protected function startTunnel(Tunnel $tunnel, string $host, int $port): Process
     {
-        $io->text("Starting <info>{$tunnel->name()}</info> tunnel...");
+        $process = app(TunnelRunner::class)->start($tunnel, $host, $port);
 
-        $process = $tunnel->start($host, $port);
-
-        $this->printTunnelUrl($io, $process);
+        $this->io()->text("Started <info>{$tunnel->name()}</info> tunnel.");
 
         return $process;
-    }
-
-    /**
-     * Polls the tunnel output until a public URL is detected, then prints it.
-     */
-    protected function printTunnelUrl(SymfonyStyle $io, Process $process): void
-    {
-        $url = $this->pollForUrl($process);
-
-        $url !== null
-            ? $io->success("Public URL: {$url}")
-            : $io->note('Could not auto-detect the public URL. Check tunnel output above.');
-    }
-
-    /**
-     * Reads tunnel process output and attempts to extract a public HTTPS URL.
-     */
-    protected function pollForUrl(Process $process): ?string
-    {
-        $deadline = time() + 15;
-
-        while (time() < $deadline && $process->isRunning()) {
-            $output = $process->getOutput().$process->getErrorOutput();
-
-            if (preg_match(
-                '#https?://[^\s"\'<>]+\.(?:ngrok|trycloudflare|loca\.lt|pinggy|zrok)\.[a-z]+[^\s"\'<>]*#i',
-                $output,
-                $m,
-            )) {
-                return $m[0];
-            }
-
-            // @codeCoverageIgnoreStart
-            usleep(500_000);
-            // @codeCoverageIgnoreEnd
-        }
-
-        return null;
     }
 
     /**
@@ -226,18 +136,20 @@ class ExposeCommand extends BaseCommand
      *
      * @codeCoverageIgnore
      */
-    protected function waitForShutdown(SymfonyStyle $io, Process $serverProcess, Process $tunnelProcess): void
+    protected function waitForShutdown(Process $serverProcess, Process $tunnelProcess): void
     {
-        $io->text('<comment>Press Ctrl+C to stop the tunnel and server.</comment>');
+        $this->io()->text('<comment>Press Ctrl+C to stop the tunnel and server.</comment>');
+
+        $date = app(Date::class);
 
         while ($serverProcess->isRunning() && $tunnelProcess->isRunning()) {
-            usleep(500_000);
+            $date->sleep();
         }
 
         $tunnelProcess->stop();
         $serverProcess->stop();
 
-        $io->newLine();
-        $io->success('Tunnel and server stopped.');
+        $this->io()->newLine();
+        $this->io()->success('Tunnel and server stopped.');
     }
 }

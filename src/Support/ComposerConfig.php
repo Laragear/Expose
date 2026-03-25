@@ -21,6 +21,14 @@ class ComposerConfig
     }
 
     /**
+     * Returns the full extra.expose section as an array.
+     */
+    public function all(): array
+    {
+        return $this->file->read()['extra'] ?? [];
+    }
+
+    /**
      * Reads a dot-notated key from the extra.expose section.
      */
     public function get(string $key, mixed $default = null): mixed
@@ -50,14 +58,6 @@ class ComposerConfig
     public function set(string $key, mixed $value): void
     {
         $this->source->addProperty("extra.$key", $value);
-    }
-
-    /**
-     * Returns the full extra.expose section as an array.
-     */
-    public function all(): array
-    {
-        return $this->file->read()['extra'] ?? [];
     }
 
     /**

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
 use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 
@@ -69,9 +71,10 @@ class PinggyTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $process = $this->buildProcess(
+        $process = $factory->command(
+            $this->binaryCommand(),
             'ssh',
             '-p',
             (string) self::SSH_PORT,
@@ -79,7 +82,9 @@ class PinggyTunnel extends AbstractTunnel
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'ServerAliveInterval=30',
             self::SSH_SERVER
-        )->process();
+        )
+            ->setTimeout(null)
+            ->process();
 
         $process->start();
 
@@ -89,7 +94,7 @@ class PinggyTunnel extends AbstractTunnel
     /**
      * Pinggy is SSH-based; there is nothing to update or uninstall.
      */
-    public function update(SymfonyStyle $io, bool $force = false): void
+    public function update(BinaryManager $manager, SymfonyStyle $io, bool $force = false): void
     {
         $io->note('Pinggy is SSH-based. Ensure your system SSH client is up to date.');
     }
@@ -97,7 +102,7 @@ class PinggyTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function uninstall(SymfonyStyle $io): void
+    public function uninstall(BinaryManager $manager, SymfonyStyle $io): void
     {
         $io->note('Pinggy is SSH-based and has no binary to remove.');
     }

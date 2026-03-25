@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Laragear\Expose\Tunnels;
 
 use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 use function json_decode;
@@ -66,15 +67,18 @@ class ZrokTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $process = $this->buildProcess(
+        $process = $factory->command(
             $this->binaryCommand(),
-            'share', 'public',
+            'share',
+            'public',
             '--backend-mode', 'proxy',
             '--bind-addr', '127.0.0.1:' . self::CONSOLE_PORT,
-            "http://$host:$port",
-        )->process();
+            "http://$host:$port"
+        )
+            ->setTimeout(null)
+            ->process();
 
         $process->start();
 

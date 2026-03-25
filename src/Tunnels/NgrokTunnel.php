@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
 use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 use function json_decode;
@@ -66,9 +68,12 @@ class NgrokTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $process = $this->buildProcess($this->binaryCommand(), 'http', '--log', 'stdout', "$host:$port")->process();
+        $process = $factory
+            ->command($this->binaryCommand(), 'http', '--log', 'stdout', "$host:$port")
+            ->setTimeout(null)
+            ->process();
 
         $process->start();
 
@@ -98,7 +103,7 @@ class NgrokTunnel extends AbstractTunnel
     /**
      * Updates ngrok by running `ngrok update`.
      */
-    public function update(SymfonyStyle $io, bool $force = false): void
+    public function update(BinaryManager $manager, SymfonyStyle $io, bool $force = false): void
     {
         $io->text('Updating <info>ngrok</info>...');
 

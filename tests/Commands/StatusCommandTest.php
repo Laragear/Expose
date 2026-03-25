@@ -1,83 +1,146 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Tests\Commands;
 
 use Laragear\Expose\Commands\StatusCommand;
+use Laragear\Expose\Contracts\InstallableTunnel;
+use Laragear\Expose\Contracts\Tunnel;
+use Laragear\Expose\Support\ComposerConfig;
+use Laragear\Expose\Support\TunnelRegistry;
+use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
-use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
+use Tests\TestCase;
 
-/** Tests StatusCommand output and edge cases. */
-class StatusCommandTest extends CommandTestCase
+class StatusCommandTest extends TestCase
 {
-    protected function makeCommand(): Command
+    protected StatusCommand $command;
+
+    protected function setUp(): void
     {
-        return new StatusCommand();
+        parent::setUp();
+
+        $this->command = new StatusCommand();
     }
 
-    public function test_throws_when_no_tunnel_configured(): void
+    public function test_command_configuration(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir);
+        static::assertSame('expose:status', $this->command->getName());
+        static::assertSame(
+            'Show the current status of the configured tunnel service.', $this->command->getDescription()
+        );
 
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessageMatches('/No tunnel service configured/');
+        static::assertCount(1, $this->command->getDefinition()->getOptions());
 
-            $this->runCommand();
-        });
+        $optionTunnel = $this->command->getDefinition()->getOption('tunnel');
+
+        static::assertSame('tunnel', $optionTunnel->getName());
+        static::assertSame('t', $optionTunnel->getShortcut());
+        static::assertNull($optionTunnel->getDefault());
+        static::assertSame('Override which tunnel to check.', $optionTunnel->getDescription());
     }
 
-    public function test_exits_successfully_when_tunnel_configured_but_not_installed(): void
+    public function test_fails_when_no_tunnel_is_available(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir, ['tunnel' => 'ngrok']);
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturnNull();
 
-            // ngrok is almost certainly not installed in CI — status should still succeed
-            $tester = $this->runAndGetTester();
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No tunnel service configured. Run `composer expose` first');
 
-            static::assertSame(Command::SUCCESS, $tester->getStatusCode());
-        });
+        static::assertSame(StatusCommand::FAILURE, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
-    public function test_override_tunnel_option_is_respected(): void
+    public function test_fails_when_tunnel_is_not_installable(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            // composer.json says ngrok but --tunnel=zrok should override
-            $this->seedComposerJson($dir, ['tunnel' => 'ngrok']);
-
-            $tester = $this->runAndGetTester(['--tunnel' => 'zrok']);
-
-            static::assertSame(Command::SUCCESS, $tester->getStatusCode());
-            static::assertStringContainsString('Zrok', $tester->getDisplay());
+        $this->mock(ComposerConfig::class, static function (MockInterface $mock): void {
+            $mock->expects('get')->with('tunnel')->andReturn('test-tunnel');
         });
+
+        $tunnel = $this->mock(Tunnel::class, static function (MockInterface $mock): void {
+            $mock->expects('name')->twice()->andReturn('test-tunnel-name');
+        });
+
+        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($tunnel): void {
+            $mock->expects('make')->with('test-tunnel')->andReturn($tunnel);
+        });
+
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('title')->with("test-tunnel-name Status");
+            $mock->expects('error')->with("test-tunnel-name has no logic for installation.");
+        });
+
+        static::assertSame(StatusCommand::FAILURE, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
-    public function test_throws_for_unknown_tunnel_override(): void
+    public function test_fails_when_tunnel_is_not_installed(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir, ['tunnel' => 'ngrok']);
-
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessageMatches('/Unknown tunnel service/');
-
-            $this->runCommand(['--tunnel' => 'nonexistent-service']);
+        $this->mock(ComposerConfig::class, static function (MockInterface $mock): void {
+            $mock->expects('get')->with('tunnel')->andReturn('test-tunnel');
         });
+
+        $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock): void {
+            $mock->expects('name')->twice()->andReturn('test-tunnel-name');
+            $mock->expects('isInstalled')->andReturnFalse();
+        });
+
+        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($tunnel): void {
+            $mock->expects('make')->with('test-tunnel')->andReturn($tunnel);
+        });
+
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('title')->with("test-tunnel-name Status");
+            $mock->expects('error')->with("test-tunnel-name is not installed.");
+        });
+
+        static::assertSame(StatusCommand::FAILURE, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
-    public function test_status_output_contains_status_heading(): void
+    public static function providesTunnelStatus(): array
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir, ['tunnel' => 'cloudflare']);
+        return [
+            [true, 'https://test-tunnel.com', 2],
+            [false, null, null],
+        ];
+    }
 
-            $tester = $this->runAndGetTester([], ['decorated' => false]);
-
-            static::assertStringContainsStringIgnoringCase('status', $tester->getDisplay());
+    #[DataProvider('providesTunnelStatus')]
+    public function test_shows_tunnel_status(bool $isRunning, ?string $url, ?int $connections): void
+    {
+        $this->mock(ComposerConfig::class, static function (MockInterface $mock): void {
+            $mock->expects('get')->with('tunnel')->andReturn('test-tunnel');
         });
+
+        $tunnel = $this->mock(
+            InstallableTunnel::class,
+            static function (MockInterface $mock) use ($isRunning, $url, $connections): void {
+                $mock->expects('name')->andReturn('test-tunnel-name');
+                $mock->expects('isInstalled')->andReturnTrue();
+                $mock->expects('status')->andReturn([
+                    'running' => $isRunning,
+                    'url' => $url,
+                    'connections' => $connections,
+                ]);
+            }
+        );
+
+        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($tunnel): void {
+            $mock->expects('make')->with('test-tunnel')->andReturn($tunnel);
+        });
+
+        $this->mock(
+            SymfonyStyle::class, static function (MockInterface $mock) use ($isRunning, $url, $connections): void {
+                $mock->expects('title')->with("test-tunnel-name Status");
+                $mock->expects('definitionList')->with(
+                    ['Status' => $isRunning ? '<info>Running</info>' : '<comment>Not running</comment>'],
+                    ['Public URL' => $url ?? '-'],
+                    ['Connections' => $connections !== null ? (string) $connections : '-'],
+                );
+            }
+        );
+
+        static::assertSame(StatusCommand::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 }

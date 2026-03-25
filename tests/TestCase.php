@@ -9,6 +9,9 @@ use Laragear\Expose\Container\Container;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase as BaseTestCase;
+use function array_map;
+use function array_merge;
+use function array_reduce;
 use function class_exists;
 use const DIRECTORY_SEPARATOR;
 
@@ -33,6 +36,18 @@ abstract class TestCase extends BaseTestCase
         Container::setInstance($this->app = null);
 
         Mockery::close();
+    }
+
+    public static function providesArchAndOs(): iterable
+    {
+        $arch = ['arm64', 'amd64'];
+        $os = ['Windows', 'Linux', 'Darwin'];
+
+        return array_reduce($os, static function ($carry, $o) use ($arch): array {
+            return array_merge($carry, array_map(static function ($a) use ($o): array {
+                return [$o, $a];
+            }, $arch));
+        }, []);
     }
 
     /**
@@ -105,7 +120,7 @@ abstract class TestCase extends BaseTestCase
      * @template TMocked
      *
      * @param  class-string<TMocked>  $service
-     * @param  \Closure(TMocked&\Mockery\MockInterface):void  $mock
+     * @param  (\Closure(TMocked&\Mockery\MockInterface):void)|null  $mock
      * @return TMocked&\Mockery\MockInterface
      */
     protected function mock(string $service, ?Closure $mock = null): MockInterface
@@ -114,9 +129,11 @@ abstract class TestCase extends BaseTestCase
             return $mock;
         };
 
-        $instance = Mockery::mock($service);
+        $app = Container::getInstance();
 
-        Container::getInstance()->instance($service, $mock($instance) ?? $instance);
+        $instance = $app->has($service) ? $app->get($service) : Mockery::mock($service);
+
+        $app->instance($service, $mock($instance) ?? $instance);
 
         return $instance;
     }

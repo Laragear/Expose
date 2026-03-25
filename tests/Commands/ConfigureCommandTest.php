@@ -55,32 +55,26 @@ class ConfigureCommandTest extends TestCase
 
     public function test_resets_tunnel(): void
     {
-        $this->app->instance(InputInterface::class, $input = new ArrayInput(['--reset' => true]));
-        $this->app->instance(OutputInterface::class, $output = new NullOutput());
-
         $this->mock(SymfonyStyle::class)
             ->expects('success')
             ->with('Tunnel preference reset. Run `composer expose` to choose again.');
 
         $this->mock(ComposerConfig::class)->expects('forget')->with('tunnel');
 
-        static::assertSame(Command::SUCCESS, $this->command->run($input, $output));
+        static::assertSame(
+            Command::SUCCESS, $this->command->run(new ArrayInput(['--reset' => true]), new NullOutput())
+        );
     }
 
     public function test_configures_non_installable_tunnel(): void
     {
-        $this->app->instance(InputInterface::class, $input = new ArrayInput([]));
-        $this->app->instance(OutputInterface::class, $output = new NullOutput());
-
         $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
             $mock->expects('title')->with('Configuring test-tunnel');
             $mock->expects('warning')->with('test-tunnel does not appear to be installed. Configuration may not persist.');
             $mock->expects('success')->with('test-tunnel configured successfully.');
         });
 
-        $this->mock(ComposerConfig::class, static function (MockInterface $mock): void {
-            $mock->expects('get')->with('tunnel')->andReturn('test-tunnel');
-        });
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('test-tunnel');
 
         $tunnel = $this->mock(Tunnel::class, static function (MockInterface $mock): void {
             $mock->expects('name')->times(3)->andReturn('test-tunnel');
@@ -90,26 +84,19 @@ class ConfigureCommandTest extends TestCase
             $mock->expects('configure');
         });
 
-        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($tunnel): void {
-            $mock->expects('make')->with('test-tunnel')->andReturn($tunnel);
-        });
+        $this->mock(TunnelRegistry::class)->expects('make')->with('test-tunnel')->andReturn($tunnel);
 
-        static::assertSame(Command::SUCCESS, $this->command->run($input, $output));
+        static::assertSame(Command::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
     public function test_configures_installable_tunnel_installed(): void
     {
-        $this->app->instance(InputInterface::class, $input = new ArrayInput([]));
-        $this->app->instance(OutputInterface::class, $output = new NullOutput());
-
         $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
             $mock->expects('title')->with('Configuring test-tunnel');
             $mock->expects('success')->with('test-tunnel configured successfully.');
         });
 
-        $this->mock(ComposerConfig::class, static function (MockInterface $mock): void {
-            $mock->expects('get')->with('tunnel')->andReturn('test-tunnel');
-        });
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('test-tunnel');
 
         $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock): void {
             $mock->expects('name')->times(2)->andReturn('test-tunnel');
@@ -120,27 +107,20 @@ class ConfigureCommandTest extends TestCase
             $mock->expects('isInstalled')->andReturnTrue();
         });
 
-        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($tunnel): void {
-            $mock->expects('make')->with('test-tunnel')->andReturn($tunnel);
-        });
+        $this->mock(TunnelRegistry::class)->expects('make')->with('test-tunnel')->andReturn($tunnel);
 
-        static::assertSame(Command::SUCCESS, $this->command->run($input, $output));
+        static::assertSame(Command::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
     public function test_configures_installable_tunnel_not_installed(): void
     {
-        $this->app->instance(InputInterface::class, $input = new ArrayInput([]));
-        $this->app->instance(OutputInterface::class, $output = new NullOutput());
-
         $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
             $mock->expects('title')->with('Configuring test-tunnel');
             $mock->expects('success')->with('test-tunnel configured successfully.');
             $mock->expects('warning')->with('test-tunnel does not appear to be installed. Configuration may not persist.');
         });
 
-        $this->mock(ComposerConfig::class, static function (MockInterface $mock): void {
-            $mock->expects('get')->with('tunnel')->andReturn('test-tunnel');
-        });
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('test-tunnel');
 
         $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock): void {
             $mock->expects('name')->times(3)->andReturn('test-tunnel');
@@ -151,10 +131,8 @@ class ConfigureCommandTest extends TestCase
             $mock->expects('isInstalled')->andReturnFalse();
         });
 
-        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($tunnel): void {
-            $mock->expects('make')->with('test-tunnel')->andReturn($tunnel);
-        });
+        $this->mock(TunnelRegistry::class)->expects('make')->with('test-tunnel')->andReturn($tunnel);
 
-        static::assertSame(Command::SUCCESS, $this->command->run($input, $output));
+        static::assertSame(Command::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));;
     }
 }

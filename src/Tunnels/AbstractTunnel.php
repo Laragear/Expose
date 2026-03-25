@@ -13,6 +13,7 @@ use RuntimeException;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 use function array_shift;
+use function preg_match;
 
 /**
  * Provides shared behavior for all Tunnel implementations.
@@ -75,11 +76,11 @@ abstract class AbstractTunnel implements InstallableTunnel
     /**
      * Re-downloads the binary or reinstalls the NPM package. Subclasses may override.
      */
-    public function update(SymfonyStyle $io, bool $force = false): void
+    public function update(BinaryManager $manager, SymfonyStyle $io, bool $force = false): void
     {
         if ($this->isInstallableViaNpm()) {
             $io->text("Updating <info>{$this->name()}</info> via NPM...");
-            $this->binaryManager->installViaNpm((string) $this->npmPackageName());
+            $manager->installViaNpm((string) $this->npmPackageName());
 
             return;
         }
@@ -90,25 +91,23 @@ abstract class AbstractTunnel implements InstallableTunnel
 
         $io->text("Downloading latest <info>{$this->name()}</info> binary...");
 
-        $this->binaryManager->downloadViaCurl($url, $this->binary());
+        $manager->downloadViaCurl($url, $this->binary());
     }
 
     /**
      * Removes the binary or NPM package from the system. Subclasses may override.
      */
-    public function uninstall(SymfonyStyle $io): void
+    public function uninstall(BinaryManager $manager, SymfonyStyle $io): void
     {
         if ($this->isInstallableViaNpm() && $this->npmPackageName !== null) {
             $io->text("Uninstalling <info>{$this->name()}</info> NPM package...");
 
-            $this->binaryManager->uninstallViaNpm($this->npmPackageName);
+            $manager->uninstallViaNpm($this->npmPackageName);
+        } else {
+            $io->text("Removing <info>{$this->name()}</info> binary...");
 
-            return;
+            $manager->removeBinary($this->binary());
         }
-
-        $io->text("Removing <info>{$this->name()}</info> binary...");
-
-        $this->binaryManager->removeBinary($this->binary());
     }
 
     /**
@@ -125,6 +124,20 @@ abstract class AbstractTunnel implements InstallableTunnel
     public function configurableOptions(): array
     {
         return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function publishedAddress(Process $tunnelProcess): ?string
+    {
+        $output = $tunnelProcess->getOutput().$tunnelProcess->getErrorOutput();
+
+        preg_match(
+            '#https?://[^\s"\'<>]+\.(?:ngrok|trycloudflare|loca\.lt|pinggy|zrok)\.[a-z]+[^\s"\'<>]*#i', $output, $m,
+        );
+
+        return $m[0] ?? null;
     }
 
     /**

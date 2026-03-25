@@ -17,7 +17,7 @@ class BinaryManager
     /**
      * Relative path inside the project root where downloaded binaries are stored.
      */
-    protected string $binariesDir = '.expose'.DIRECTORY_SEPARATOR.'bin';
+    public string $binariesDir = '.expose'.DIRECTORY_SEPARATOR.'bin';
 
     /**
      * Create a new Binary Manager instance.

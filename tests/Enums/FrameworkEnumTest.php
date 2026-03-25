@@ -18,6 +18,9 @@ class FrameworkEnumTest extends TestCase
             'Laravel'  => [Framework::Laravel],
             'Lumen'    => [Framework::Lumen],
             'Symfony'  => [Framework::Symfony],
+            'Yii'       => [Framework::Yii],
+            'CakePHP'   => [Framework::CakePHP],
+            'WordPress' => [Framework::WordPress],
         ];
     }
 
@@ -25,9 +28,6 @@ class FrameworkEnumTest extends TestCase
     public static function frameworksWithoutBuiltInServer(): array
     {
         return [
-            'CakePHP'   => [Framework::CakePHP],
-            'Yii'       => [Framework::Yii],
-            'WordPress' => [Framework::WordPress],
             'Unknown'   => [Framework::Unknown],
         ];
     }

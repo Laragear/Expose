@@ -12,7 +12,7 @@ use function explode;
 /**
  * Starts a local PHP development server appropriate for the detected framework.
  */
-readonly class ServerRunner
+class ServerRunner
 {
     /**
      * Create a new Server Runner instance.

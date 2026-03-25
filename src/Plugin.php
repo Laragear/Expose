@@ -22,6 +22,9 @@ use Laragear\Expose\Commands\StatusCommand;
 use Laragear\Expose\Commands\UninstallCommand;
 use Laragear\Expose\Commands\UpdateCommand;
 use Laragear\Expose\Container\Container;
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\File;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use function app;
@@ -55,6 +58,12 @@ class Plugin implements PluginInterface, Capable, EventSubscriberInterface, Comm
 
         $container->singleton(JsonConfigSource::class, static function (Container $container): JsonConfigSource {
             return new JsonConfigSource($container->make(JsonFile::class));
+        });
+
+        $container->singleton(BinaryManager::class, static function (Container $container): BinaryManager {
+            return new BinaryManager(
+                $container->make(File::class), $container->make(ProcessFactory::class), $container->make('projectRoot')
+            );
         });
     }
 

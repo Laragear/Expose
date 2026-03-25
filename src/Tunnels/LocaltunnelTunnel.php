@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Laragear\Expose\Tunnels;
 
 use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Process\Process;
 
 /**
@@ -51,11 +52,12 @@ class LocaltunnelTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $process = $this->buildProcess(
-            $this->binaryCommand(), '--port', (string) $port, '--local-host', $host
-        )->process();
+        $process = $factory
+            ->command($this->binaryCommand(), '--port', (string) $port, '--local-host', $host)
+            ->setTimeout(null)
+            ->process();
 
         $process->start();
 

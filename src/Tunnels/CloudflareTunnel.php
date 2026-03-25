@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Laragear\Expose\Tunnels;
 
 use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 use function json_decode;
@@ -63,15 +64,17 @@ class CloudflareTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $process = $this->buildProcess(
+        $process = $factory->command(
             $this->binaryCommand(),
             'tunnel',
             '--url', "http://$host:$port",
             '--metrics', 'localhost:'.self::METRICS_PORT,
             '--no-autoupdate',
-        )->process();
+        )
+            ->setTimeout(null)
+            ->process();
 
         $process->start();
 
