@@ -1,3 +1,4 @@
+# LARAVEL_BYPASS_ENV_CHECK=Laravel
 WP_HOME=http://localhost
 WP_SITEURL=http://localhost/wp
 DB_NAME=wordpress

@@ -264,4 +264,116 @@ class ExposeCommandTest extends TestCase
 
         static::assertSame(ExposeCommand::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
+
+    public function test_overrides_tunnel(): void
+    {
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('section')->with('Starting PHP project on http://localhost:8080');
+            $mock->expects('text')->with('Local server started. Waiting for tunnel...');
+            $mock->expects('text')->with('Started <info>override-tunnel</info> tunnel.');
+            $mock->expects('newLine');
+            $mock->expects('text')->with('Detected project: <info>PHP</info>');
+            $mock->expects('text')->with('<comment>Press Ctrl+C to stop the tunnel and server.</comment>');
+            $mock->expects('success')->with('Tunnel and server stopped.');
+        });
+
+        $serverProcess = $this->mock(Process::class, static function (MockInterface $mock): void {
+            $mock->expects('stop');
+            $mock->expects('isRunning')->andReturnFalse();
+        });
+
+        $this->mock(ServerRunner::class)
+            ->expects('start')
+            ->with(Framework::Unknown, 'localhost', '8080')
+            ->andReturn($serverProcess);
+
+        $this->mock(ProjectDetector::class)->expects('detect')->andReturn(Framework::Unknown);
+
+        $tunnelProcess = $this->mock(Process::class, static function (MockInterface $mock): void {
+            $mock->expects('getOutput')->zeroOrMoreTimes()->andReturn('https://test.tunnel.com/');
+            $mock->expects('getErrorOutput')->zeroOrMoreTimes()->andReturn('');
+            $mock->expects('stop');
+        });
+
+        $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock) use ($tunnelProcess): void {
+            $mock->expects('isInstalled')->andReturnTrue();
+            $mock->expects('name')->once()->andReturn('override-tunnel');
+        });
+
+        $this->mock(TunnelRunner::class)
+            ->expects('start')
+            ->with($tunnel, 'localhost', '8080')
+            ->andReturn($tunnelProcess);
+
+        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($tunnel): void {
+            $mock->expects('make')->with('override-tunnel')->andReturn($tunnel);
+        });
+
+        static::assertSame(
+            ExposeCommand::SUCCESS,
+            $this->command->run(new ArrayInput(['--tunnel' => 'override-tunnel']), new NullOutput())
+        );
+    }
+
+    public function test_asks_for_tunnel(): void
+    {
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('title')->with('No tunnel service configured.');
+            $mock->expects('choice')
+                ->with('Which tunnel service would you like to use?', ['foo-tunnel' => 'bar', 'baz' => 'qux'])
+                ->andReturn('foo-tunnel');
+            $mock->expects('success')
+                ->with('Saved <info>foo-tunnel</info> as your preferred tunnel.');
+            $mock->expects('section')->with('Starting PHP project on http://localhost:8080');
+            $mock->expects('text')->with('Local server started. Waiting for tunnel...');
+            $mock->expects('text')->with('Started <info>override-tunnel</info> tunnel.');
+            $mock->expects('newLine');
+            $mock->expects('text')->with('Detected project: <info>PHP</info>');
+            $mock->expects('text')->with('<comment>Press Ctrl+C to stop the tunnel and server.</comment>');
+            $mock->expects('success')->with('Tunnel and server stopped.');
+        });
+
+        $this->mock(ComposerConfig::class, static function (MockInterface $mock): void {
+            $mock->expects('get')->with('tunnel')->andReturnNull();
+            $mock->expects('set')->with('tunnel', 'foo-tunnel');
+        });
+
+        $serverProcess = $this->mock(Process::class, static function (MockInterface $mock): void {
+            $mock->expects('stop');
+            $mock->expects('isRunning')->andReturnFalse();
+        });
+
+        $this->mock(ServerRunner::class)
+            ->expects('start')
+            ->with(Framework::Unknown, 'localhost', '8080')
+            ->andReturn($serverProcess);
+
+        $this->mock(ProjectDetector::class)->expects('detect')->andReturn(Framework::Unknown);
+
+        $tunnelProcess = $this->mock(Process::class, static function (MockInterface $mock): void {
+            $mock->expects('getOutput')->zeroOrMoreTimes()->andReturn('https://test.tunnel.com/');
+            $mock->expects('getErrorOutput')->zeroOrMoreTimes()->andReturn('');
+            $mock->expects('stop');
+        });
+
+        $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock) use ($tunnelProcess): void {
+            $mock->expects('isInstalled')->andReturnTrue();
+            $mock->expects('name')->once()->andReturn('override-tunnel');
+        });
+
+        $this->mock(TunnelRunner::class)
+            ->expects('start')
+            ->with($tunnel, 'localhost', '8080')
+            ->andReturn($tunnelProcess);
+
+        $this->mock(TunnelRegistry::class, static function (MockInterface $mock) use ($tunnel): void {
+            $mock->expects('make')->with('foo-tunnel')->andReturn($tunnel);
+            $mock->expects('choiceMap')->andReturn(['foo-tunnel' => 'bar', 'baz' => 'qux']);
+        });
+
+        static::assertSame(
+            ExposeCommand::SUCCESS,
+            $this->command->run(new ArrayInput([]), new NullOutput())
+        );
+    }
 }

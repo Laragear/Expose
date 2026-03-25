@@ -34,12 +34,13 @@ class ComposerConfigTest extends TestCase
 
     public function test_get(): void
     {
-        $this->file->expects('read')->times(4)->andReturn(['extra' => ['foo' => 'bar', 'baz' => ['quz' => 'qux']]]);
+        $this->file->expects('read')->times(5)->andReturn(['extra' => ['foo' => 'bar', 'baz' => ['quz' => 'qux']]]);
 
         static::assertSame(['foo' => 'bar', 'baz' => ['quz' => 'qux']], $this->composer->get(''));
         static::assertSame(['quz' => 'qux'], $this->composer->get('baz'));
         static::assertSame('bar', $this->composer->get('foo'));
         static::assertSame('qux', $this->composer->get('baz.quz'));
+        static::assertSame('default', $this->composer->get('baz.invalid', 'default'));
     }
 
     public function test_set(): void

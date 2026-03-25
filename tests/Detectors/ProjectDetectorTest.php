@@ -92,6 +92,18 @@ class ProjectDetectorTest extends TestCase
         static::assertSame(Framework::WordPress, $framework);
     }
 
+    public function test_detects_wordpress_from_wp_config_with_no_env(): void
+    {
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $this->file->expects('get')->with('/app/composer.json')->andReturn(json_encode(['require' => []]));
+        $this->file->expects('missing')->with('/app/.env')->andReturnTrue();
+        $this->file->expects('exists')->with('/app/wp-config.php')->andReturnTrue();
+
+        $framework = $this->detector->detect();
+
+        static::assertSame(Framework::WordPress, $framework);
+    }
+
     public function test_detects_wordpress_from_wp_blog_header(): void
     {
         $this->file->expects('missing')->with('/app/composer.json')->andReturnFalse();

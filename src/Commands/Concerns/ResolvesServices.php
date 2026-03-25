@@ -73,13 +73,13 @@ trait ResolvesServices
     {
         $this->io()->title('No tunnel service configured.');
 
-        $key = $this->io()->choice('Which tunnel service would you like to use?', $this->registry()->choiceMap());
+        $key = (string) $this->io()->choice('Which tunnel service would you like to use?', $this->registry()->choiceMap());
 
         $this->config()->set('tunnel', $key);
 
         $this->io()->success("Saved <info>$key</info> as your preferred tunnel.");
 
-        return (string) $key;
+        return $key;
     }
 
     /**

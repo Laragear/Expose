@@ -28,6 +28,12 @@ class NpmInstaller
     {
         $package = $tunnel->npmPackageName();
 
+        if (empty($package)) {
+            $this->io->error("The package name for the tunnel [{$tunnel->name()}] is missing.");
+
+            return false;
+        }
+
         if (!$this->manager->isNpmAvailable()) {
             $this->io->error("NPM is not installed. Please install Node.js and NPM first, then run: npm install -g $package.");
 

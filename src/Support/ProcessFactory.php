@@ -15,6 +15,7 @@ use const PHP_OS_FAMILY;
  * @mixin \Symfony\Component\Process\Process
  *
  * @phpstan-consistent-constructor
+ * @codeCoverageIgnore
  */
 class ProcessFactory
 {
