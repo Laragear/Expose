@@ -13,6 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use function app;
 use function method_exists;
 use const DIRECTORY_SEPARATOR;
 
@@ -22,6 +23,8 @@ use const DIRECTORY_SEPARATOR;
  */
 class ListTunnelsCommand extends BaseCommand
 {
+    use Concerns\ResolvesServices;
+
     /**
      * Configures the command name, description, and options.
      */
@@ -30,8 +33,9 @@ class ListTunnelsCommand extends BaseCommand
         $this
             ->setName('expose:list')
             ->setDescription('List all available tunnel services, including custom and package-provided ones.')
-            ->addOption('installed', 'i', InputOption::VALUE_NONE,
-                'Show only services whose binary is currently installed.');
+            ->addOption(
+                'installed', 'i', InputOption::VALUE_NONE, 'Show only services whose binary is currently installed.'
+            );
     }
 
     /**
@@ -39,29 +43,21 @@ class ListTunnelsCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
+        $activeTunnel = $this->config()->get('tunnel');
 
-        $projectRoot = (string) getcwd();
-        $config = new ComposerConfig($projectRoot.DIRECTORY_SEPARATOR.'composer.json');
-        $registry = new TunnelRegistry($projectRoot);
-        $activeTunnel = $config->get('tunnel');
-        $onlyInstalled = (bool) $input->getOption('installed');
+        $this->io()->title('Available Tunnel Services');
 
-        $io->title('Available Tunnel Services');
-
-        $rows = $this->buildRows($registry, $activeTunnel, $onlyInstalled);
+        $rows = $this->buildRows($activeTunnel, (bool) $input->getOption('installed'));
 
         if (empty($rows)) {
-            $io->note('No tunnel services found. Try removing the --installed filter.');
+            $this->io()->note('No tunnel services found. Try removing the --installed filter.');
+
             return self::SUCCESS;
         }
 
-        $io->table(
-            ['Key', 'Label', 'Type', 'Binary', 'Installed', 'Active'],
-            $rows,
-        );
+        $this->io()->table(['Key', 'Label', 'Type', 'Binary', 'Installed', 'Active'], $rows);
 
-        $this->printHelp($io, $activeTunnel);
+        $this->printHelp($activeTunnel);
 
         return self::SUCCESS;
     }
@@ -71,9 +67,11 @@ class ListTunnelsCommand extends BaseCommand
      *
      * @return list<list<string>>
      */
-    protected function buildRows(TunnelRegistry $registry, mixed $activeTunnel, bool $onlyInstalled): array
+    protected function buildRows(mixed $activeTunnel, bool $onlyInstalled): array
     {
         $rows = [];
+
+        $registry = app(TunnelRegistry::class);
 
         foreach ($registry->keys() as $key) {
             $tunnel = $registry->make($key);
@@ -108,13 +106,12 @@ class ListTunnelsCommand extends BaseCommand
     /**
      * Prints contextual help based on whether a tunnel is already configured.
      */
-    protected function printHelp(SymfonyStyle $io, mixed $activeTunnel): void
+    protected function printHelp(mixed $activeTunnel): void
     {
-        if ($activeTunnel === null) {
-            $io->note('No tunnel configured yet. Run `composer expose` to choose one.');
-            return;
-        }
-
-        $io->note("Active tunnel: <info>{$activeTunnel}</info>. Change it with: composer expose:configure --reset");
+        $this->io()->note(
+            $activeTunnel
+                ? "Active tunnel: <info>$activeTunnel</info>. Change it with: composer expose:configure --reset"
+                : 'No tunnel configured yet. Run `composer expose` to choose one.'
+        );
     }
 }

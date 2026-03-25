@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
@@ -40,30 +42,6 @@ class PinggyTunnel extends AbstractTunnel
     }
 
     /**
-     * Pinggy uses the system SSH binary, so checking install means checking for `ssh`.
-     */
-    public function isInstalled(): bool
-    {
-        return (new ExecutableFinder())->find('ssh') !== null;
-    }
-
-    /**
-     * Pinggy is not distributed via NPM.
-     */
-    public function isInstallableViaNpm(): bool
-    {
-        return false;
-    }
-
-    /**
-     * Pinggy has no NPM package.
-     */
-    public function npmPackageName(): ?string
-    {
-        return null;
-    }
-
-    /**
      * Pinggy requires no binary download.
      */
     public function downloadUrl(): ?string
@@ -77,8 +55,8 @@ class PinggyTunnel extends AbstractTunnel
     public function configurableOptions(): array
     {
         return [
-            'token' => ['label' => 'Pinggy Access Token (optional)', 'default' => null, 'secret' => true],
-            'subdomain' => ['label' => 'Preferred subdomain (optional)', 'default' => null, 'secret' => false],
+            'token' => Option::secret('Pinggy Access Token (optional)')->optional(),
+            'subdomain' => Option::name('Preferred subdomain (optional)')->optional(),
         ];
     }
 
@@ -93,18 +71,21 @@ class PinggyTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $command = [
+        $process = $factory->command(
+            $this->binaryCommand(),
             'ssh',
-            '-p', (string) self::SSH_PORT,
-            '-R', "0:{$host}:{$port}",
+            '-p',
+            (string) self::SSH_PORT,
+            '-R', "0:$host:$port",
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'ServerAliveInterval=30',
-            self::SSH_SERVER,
-        ];
+            self::SSH_SERVER
+        )
+            ->setTimeout(null)
+            ->process(); // @phpstan-ignore-line
 
-        $process = $this->buildProcess($command);
         $process->start();
 
         return $process;
@@ -113,7 +94,7 @@ class PinggyTunnel extends AbstractTunnel
     /**
      * Pinggy is SSH-based; there is nothing to update or uninstall.
      */
-    public function update(SymfonyStyle $io, bool $force = false): void
+    public function update(BinaryManager $manager, SymfonyStyle $io, bool $force = false): void
     {
         $io->note('Pinggy is SSH-based. Ensure your system SSH client is up to date.');
     }
@@ -121,7 +102,7 @@ class PinggyTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function uninstall(SymfonyStyle $io): void
+    public function uninstall(BinaryManager $manager, SymfonyStyle $io): void
     {
         $io->note('Pinggy is SSH-based and has no binary to remove.');
     }
@@ -145,7 +126,7 @@ class PinggyTunnel extends AbstractTunnel
         // The public URL assigned by Pinggy (e.g. https://xxxxx.a.free.pinggy.link) is
         // printed to stdout at session startup and is not recoverable afterwards, so it
         // is always returned as null here.
-        if (PHP_OS_FAMILY === 'Windows') {
+        if ($this->processFactory->isWindows()) {
             // On Windows, tasklist does not expose process arguments, so we can only
             // check for any ssh.exe process as a best-effort indicator.
             $running = $this->isProcessRunning('ssh.exe');

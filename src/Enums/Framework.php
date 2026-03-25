@@ -44,7 +44,7 @@ enum Framework: string
     public function hasBuiltInServer(): bool
     {
         return match ($this) {
-            self::Laravel, self::Lumen, self::Symfony => true,
+            self::Laravel, self::Lumen, self::Yii, self::CakePHP, self::WordPress, self::Symfony => true,
             default => false,
         };
     }
@@ -57,6 +57,9 @@ enum Framework: string
         return match ($this) {
             self::Laravel, self::Lumen => 'php artisan serve --host={host} --port={port}',
             self::Symfony => 'symfony server:start --no-tls --port={port}',
+            self::Yii => 'php yii serve --port={port} --host={host}',
+            self::CakePHP => 'bin/cake server -p {port} -H {host}',
+            self::WordPress => 'wp server --port={port} --host={host}',
             default => null,
         };
     }

@@ -17,12 +17,12 @@ use Laragear\Expose\Tunnels\ZrokTunnel;
  */
 enum TunnelService: string
 {
-    case Ngrok       = 'ngrok';
-    case Cloudflare  = 'cloudflare';
+    case Ngrok = 'ngrok';
+    case Cloudflare = 'cloudflare';
     case Instatunnel = 'instatunnel';
     case Localtunnel = 'localtunnel';
-    case Pinggy      = 'pinggy';
-    case Zrok        = 'zrok';
+    case Pinggy = 'pinggy';
+    case Zrok = 'zrok';
 
     /**
      * Returns a new Tunnel implementation instance for this service.
@@ -30,12 +30,12 @@ enum TunnelService: string
     public function make(): Tunnel
     {
         return match ($this) {
-            self::Ngrok       => new NgrokTunnel(),
-            self::Cloudflare  => new CloudflareTunnel(),
-            self::Instatunnel => new InstatunnelTunnel(),
-            self::Localtunnel => new LocaltunnelTunnel(),
-            self::Pinggy      => new PinggyTunnel(),
-            self::Zrok        => new ZrokTunnel(),
+            self::Ngrok => app(NgrokTunnel::class),
+            self::Cloudflare => app(CloudflareTunnel::class),
+            self::Instatunnel => app(InstatunnelTunnel::class),
+            self::Localtunnel => app(LocaltunnelTunnel::class),
+            self::Pinggy => app(PinggyTunnel::class),
+            self::Zrok => app(ZrokTunnel::class),
         };
     }
 
@@ -48,19 +48,11 @@ enum TunnelService: string
     {
         return array_column(
             array_map(
-                fn (self $case) => ['label' => $case->make()->label(), 'value' => $case->value],
-                self::cases()
+                fn(self $case) => ['label' => $case->make()->label(), 'value' => $case->value],
+                self::cases(),
             ),
             'value',
-            'label'
+            'label',
         );
-    }
-
-    /**
-     * Attempts to parse a string into a TunnelService, returning null if unrecognized.
-     */
-    public static function fromStringOrNull(string $value): ?self
-    {
-        return self::tryFrom($value);
     }
 }

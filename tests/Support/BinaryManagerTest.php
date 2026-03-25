@@ -5,116 +5,107 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\File;
+use Laragear\Expose\Support\ProcessFactory;
+use Mockery\MockInterface;
 use Tests\TestCase;
-use const DIRECTORY_SEPARATOR;
+use const DIRECTORY_SEPARATOR as DS;
 
-/** Tests binary path resolution, installation checks, and removal logic. */
 class BinaryManagerTest extends TestCase
 {
+    protected File&MockInterface $file;
+    protected ProcessFactory&MockInterface $process;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->file = $this->mock(File::class);
+        $this->process = $this->mock(ProcessFactory::class);
+        $this->manager = new BinaryManager($this->file, $this->process, '/app');
+    }
+
     public function test_bin_dir_returns_correct_path(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $manager = new BinaryManager($dir);
-
-            static::assertSame(
-                $dir.DIRECTORY_SEPARATOR.'.expose'.DIRECTORY_SEPARATOR.'bin',
-                $manager->binDir(),
-            );
-        });
+        static::assertSame(
+            '/app'.DS.'.expose'.DS.'bin',
+            $this->manager->binariesDir,
+        );
     }
 
     public function test_bin_path_appends_exe_on_windows(): void
     {
-        if (PHP_OS_FAMILY !== 'Windows') {
-            $this->markTestSkipped('Windows-only test.');
-        }
+        $this->process->expects('isWindows')->andReturnTrue();
 
-        $manager = new BinaryManager(DIRECTORY_SEPARATOR.'tmp'.DIRECTORY_SEPARATOR.'project');
-
-        static::assertStringEndsWith('.exe', $manager->binPath('ngrok'));
+        static::assertStringEndsWith('.exe', $this->manager->binPath('ngrok'));
     }
 
     public function test_bin_path_has_no_extension_on_unix(): void
     {
-        if (PHP_OS_FAMILY === 'Windows') {
-            $this->markTestSkipped('Unix-only test.');
-        }
+        $this->process->expects('isWindows')->andReturnFalse();
 
-        $manager = new BinaryManager('/tmp/project');
-
-        static::assertStringEndsWith('ngrok', $manager->binPath('ngrok'));
+        static::assertStringEndsWith('ngrok', $this->manager->binPath('ngrok'));
     }
 
     public function test_is_installed_returns_true_when_binary_exists_locally(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $manager = new BinaryManager($dir);
-            $binPath = $manager->binPath('fakebinary');
+        $this->file->expects('findOnPath')->with('fakebinary')->andReturn('/usr/bin/path');
 
-            mkdir(dirname($binPath), 0755, true);
-            file_put_contents($binPath, '#!/bin/sh');
-
-            static::assertTrue($manager->isInstalled('fakebinary'));
-        });
+        static::assertTrue($this->manager->isInstalled('fakebinary'));
     }
 
     public function test_is_installed_returns_false_when_binary_absent(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $manager = new BinaryManager($dir);
+        $this->process->expects('isWindows')->andReturnFalse();
 
-            // Use a name that will never exist on PATH
-            static::assertFalse($manager->isInstalled('__nonexistent_binary_xyz__'));
-        });
+        $this->file->expects('findOnPath')->with('fakebinary')->andReturnNull();
+        $this->file
+            ->expects('exists')
+            ->with($this->manager->binariesDir.DS.'fakebinary')
+            ->andReturnFalse();
+
+        static::assertFalse($this->manager->isInstalled('fakebinary'));
     }
 
     public function test_remove_binary_deletes_local_file(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $manager = new BinaryManager($dir);
-            $binPath = $manager->binPath('fakebinary');
+        $this->expectNotToPerformAssertions();
 
-            mkdir(dirname($binPath), 0755, true);
-            file_put_contents($binPath, '#!/bin/sh');
+        $this->process->expects('isWindows')->times(3)->andReturnFalse();
 
-            static::assertFileExists($binPath);
+        $this->file->expects('exists')->with($this->manager->binPath('fakebinary'))->andReturnTrue();
+        $this->file->expects('delete')->with($this->manager->binPath('fakebinary'));
 
-            $manager->removeBinary('fakebinary');
-
-            static::assertFileDoesNotExist($binPath);
-        });
+        $this->manager->removeBinary('fakebinary');
     }
 
     public function test_remove_binary_is_noop_when_file_absent(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $manager = new BinaryManager($dir);
+        $this->expectNotToPerformAssertions();
 
-            // Should not throw even when the file does not exist
-            $manager->removeBinary('__nonexistent__');
-            static::assertTrue(true);
-        });
+        $this->process->expects('isWindows')->twice()->andReturnFalse();
+
+        $this->file->expects('exists')->with($this->manager->binPath('fakebinary'))->andReturnFalse();
+        $this->file->expects('delete')->never();
+
+        $this->manager->removeBinary('fakebinary');
     }
 
     public function test_resolve_command_returns_local_path_when_binary_exists(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $manager = new BinaryManager($dir);
-            $binPath = $manager->binPath('fakebinary');
+        $this->file->expects('exists')->with('/app/.expose/bin/fakebinary')->andReturnTrue();
+        $this->process->expects('isWindows')->twice()->andReturnFalse();
 
-            mkdir(dirname($binPath), 0755, true);
-            file_put_contents($binPath, '#!/bin/sh');
+        $binPath = $this->manager->binPath('fakebinary');
 
-            static::assertSame($binPath, $manager->resolveCommand('fakebinary'));
-        });
+        static::assertSame($binPath, $this->manager->resolveCommand('fakebinary'));
     }
 
     public function test_resolve_command_returns_binary_name_when_no_local_copy(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $manager = new BinaryManager($dir);
+        $this->file->expects('exists')->with('/app/.expose/bin/ngrok')->andReturnFalse();
+        $this->process->expects('isWindows')->andReturnFalse();
 
-            static::assertSame('ngrok', $manager->resolveCommand('ngrok'));
-        });
+        static::assertSame('ngrok', $this->manager->resolveCommand('ngrok'));
     }
 }

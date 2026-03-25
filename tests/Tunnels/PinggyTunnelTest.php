@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Http;
+use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Tunnels\PinggyTunnel;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /** Tests the PinggyTunnel SSH-based implementation. */
 class PinggyTunnelTest extends TestCase
 {
-    private PinggyTunnel $tunnel;
+    protected Http&MockInterface $http;
+    protected ProcessFactory&MockInterface $process;
+    protected PinggyTunnel $tunnel;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->tunnel = new PinggyTunnel();
+        $this->tunnel = new PinggyTunnel(
+            $this->http = $this->mock(Http::class),
+            $this->mock(BinaryManager::class),
+            $this->process = $this->mock(ProcessFactory::class)
+        );
     }
 
     public function test_name_is_pinggy(): void
@@ -50,7 +60,7 @@ class PinggyTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('token', $options);
-        static::assertTrue($options['token']['secret']);
+        static::assertTrue($options['token']->isSecret);
     }
 
     public function test_configurable_options_has_subdomain(): void
@@ -58,6 +68,6 @@ class PinggyTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('subdomain', $options);
-        static::assertFalse($options['subdomain']['secret']);
+        static::assertFalse($options['subdomain']->isSecret);
     }
 }

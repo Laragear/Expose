@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Process\Process;
 
 /**
@@ -43,18 +45,20 @@ class LocaltunnelTunnel extends AbstractTunnel
     public function configurableOptions(): array
     {
         return [
-            'subdomain' => ['label' => 'Preferred subdomain (leave blank for random)', 'default' => null, 'secret' => false],
+            'subdomain' => Option::name('Preferred subdomain (leave blank for random)'),
         ];
     }
 
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $command = [$this->binaryCommand(), '--port', (string) $port, '--local-host', $host];
+        $process = $factory
+            ->command($this->binaryCommand(), '--port', (string) $port, '--local-host', $host)
+            ->setTimeout(null)
+            ->process(); // @phpstan-ignore-line
 
-        $process = $this->buildProcess($command);
         $process->start();
 
         return $process;

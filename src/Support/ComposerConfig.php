@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Support;
 
-use RuntimeException;
-use function data_forget;
-use function data_set;
+use Composer\Config\JsonConfigSource;
+use Composer\Json\JsonFile;
 
 /**
  * Manages the expose configuration stored in the project's composer.json file.
@@ -14,41 +13,11 @@ use function data_set;
 class ComposerConfig
 {
     /**
-     * Parsed contents of the composer.json file. @var array<string, mixed>
-     */
-    protected array $data = [];
-
-    /**
      * Create a new Composer Config instance.
      */
-    public function __construct(protected readonly string $path)
+    public function __construct(protected JsonConfigSource $source, protected JsonFile $file)
     {
         //
-    }
-
-    /**
-     * Reads a dot-notated key from the extra.expose section.
-     */
-    public function get(string $key, mixed $default = null): mixed
-    {
-        $config = $this->load()['extra']['expose'] ?? [];
-
-        return data_get($config, $key, $default);
-    }
-
-    /**
-     * Writes a dot-notated key into the extra.expose section and persists it.
-     */
-    public function set(string $key, mixed $value): void
-    {
-        $this->load();
-
-        $this->data['extra'] ??= [];
-        $this->data['extra']['expose'] ??= [];
-
-        data_set($this->data['extra']['expose'], $key, $value);
-
-        $this->save();
     }
 
     /**
@@ -56,7 +25,39 @@ class ComposerConfig
      */
     public function all(): array
     {
-        return $this->load()['extra']['expose'] ?? [];
+        return $this->file->read()['extra'] ?? [];
+    }
+
+    /**
+     * Reads a dot-notated key from the extra.expose section.
+     */
+    public function get(string $key, mixed $default = null): mixed
+    {
+        $config = $this->all();
+
+        // If the key is empty, return the entire config array
+        if (!$key) {
+            return $config;
+        }
+
+        // Traverse the array using the dot-separated segments
+        foreach (explode('.', $key) as $segment) {
+            if (is_array($config) && array_key_exists($segment, $config)) {
+                $config = $config[$segment];
+            } else {
+                return $default;
+            }
+        }
+
+        return $config;
+    }
+
+    /**
+     * Writes a dot-notated key into the extra.expose section and persists it.
+     */
+    public function set(string $key, mixed $value): void
+    {
+        $this->source->addProperty("extra.$key", $value);
     }
 
     /**
@@ -64,35 +65,6 @@ class ComposerConfig
      */
     public function forget(string $key): void
     {
-        data_forget($this->data, "extra.expose.$key");
-
-        $this->save();
-    }
-
-    /**
-     * Loads the composer.json file into memory, caching the result.
-     */
-    protected function load(): array
-    {
-        if (empty($this->data)) {
-            if (!file_exists($this->path)) {
-                throw new RuntimeException("composer.json not found at [$this->path].");
-            }
-
-            $this->data = json_decode((string) file_get_contents($this->path), true, 512, JSON_THROW_ON_ERROR);
-        }
-
-        return $this->data;
-    }
-
-    /**
-     * Persists the in-memory data back to composer.json with readable formatting.
-     */
-    protected function save(): void
-    {
-        file_put_contents(
-            $this->path,
-            json_encode($this->data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL,
-        );
+        $this->source->removeProperty("extra.$key");
     }
 }

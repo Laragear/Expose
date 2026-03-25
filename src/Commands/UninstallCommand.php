@@ -5,21 +5,20 @@ declare(strict_types=1);
 namespace Laragear\Expose\Commands;
 
 use Composer\Command\BaseCommand;
-use Laragear\Expose\Commands\Concerns\ResolvesTunnel;
 use Laragear\Expose\Contracts\InstallableTunnel;
+use Laragear\Expose\Support\BinaryManager;
 use Laragear\Expose\Support\ComposerConfig;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use const DIRECTORY_SEPARATOR;
 
 /**
  * Removes the tunnel service binary and optionally clears its configuration from composer.json.
  */
 class UninstallCommand extends BaseCommand
 {
-    use ResolvesTunnel;
+    use Concerns\ResolvesServices;
 
     /**
      * Configures the command name, description, and options.
@@ -34,39 +33,40 @@ class UninstallCommand extends BaseCommand
     }
 
     /**
-     * Confirms with the user and delegates to the tunnel's uninstall routine.
+     * Confirms with the user and delegates to the tunnel's uninstallation routine.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $config = new ComposerConfig(getcwd().DIRECTORY_SEPARATOR.'composer.json');
+        $key = $this->requireSavedTunnelKey($input->getOption('tunnel'));
 
-        $key = $this->requireSavedTunnelKey($config, $input->getOption('tunnel'));
         $tunnel = $this->registry()->make($key);
 
         if (!$tunnel instanceof InstallableTunnel) {
-            $io->error("{$tunnel->name()} is not uninstallable. You have to remove it manually.");
+            $this->io()->error("{$tunnel->name()} is not uninstallable. You have to remove it manually.");
+
             return self::FAILURE;
         }
 
         if (!$tunnel->isInstalled()) {
-            $io->note("{$tunnel->name()} does not appear to be installed.");
-            return self::SUCCESS;
+            $this->io()->note("{$tunnel->name()} does not appear to be installed.");
+
+            return self::FAILURE;
         }
 
-        if (!$io->confirm("Are you sure you want to uninstall {$tunnel->name()}?", false)) {
-            $io->text('Uninstall cancelled.');
-            return self::SUCCESS;
+        if (!$this->io()->confirm("Are you sure you want to uninstall {$tunnel->name()}?", false)) {
+            $this->io()->error('Uninstall cancelled.');
+
+            return self::FAILURE;
         }
 
-        $io->title("Uninstalling {$tunnel->name()}...");
-        $tunnel->uninstall($io);
+        $this->io()->title("Uninstalling {$tunnel->name()}...");
+        $tunnel->uninstall(app(BinaryManager::class), $this->io());
 
         if ($input->getOption('purge')) {
-            $this->purgeComposerConfig($io, $config);
+            $this->purgeComposerConfig();
         }
 
-        $io->success("{$tunnel->name()} has been uninstalled.");
+        $this->io()->success("{$tunnel->name()} has been uninstalled.");
 
         return self::SUCCESS;
     }
@@ -74,12 +74,12 @@ class UninstallCommand extends BaseCommand
     /**
      * Removes the entire `extra.expose` block from composer.json.
      */
-    protected function purgeComposerConfig(SymfonyStyle $io, ComposerConfig $config): void
+    protected function purgeComposerConfig(): void
     {
-        foreach (array_keys($config->all()) as $key) {
-            $config->forget($key);
+        foreach (array_keys($this->config()->all()) as $key) {
+            $this->config()->forget($key);
         }
 
-        $io->text('Expose configuration removed from <comment>composer.json</comment>.');
+        $this->io()->text('Expose configuration removed from <comment>composer.json</comment>.');
     }
 }

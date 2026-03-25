@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Http;
+use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Tunnels\LocaltunnelTunnel;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /** Tests the LocaltunnelTunnel implementation. */
 class LocaltunnelTunnelTest extends TestCase
 {
-    private LocaltunnelTunnel $tunnel;
+    protected Http&MockInterface $http;
+    protected ProcessFactory&MockInterface $process;
+    protected LocaltunnelTunnel $tunnel;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->tunnel = new LocaltunnelTunnel();
+        $this->tunnel = new LocaltunnelTunnel(
+            $this->http = $this->mock(Http::class),
+            $this->mock(BinaryManager::class),
+            $this->process = $this->mock(ProcessFactory::class)
+        );
     }
 
     public function test_name_is_localtunnel(): void
@@ -49,6 +59,6 @@ class LocaltunnelTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('subdomain', $options);
-        static::assertFalse($options['subdomain']['secret']);
+        static::assertFalse($options['subdomain']->isSecret);
     }
 }

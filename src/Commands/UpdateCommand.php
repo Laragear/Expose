@@ -5,21 +5,18 @@ declare(strict_types=1);
 namespace Laragear\Expose\Commands;
 
 use Composer\Command\BaseCommand;
-use Laragear\Expose\Commands\Concerns\ResolvesTunnel;
 use Laragear\Expose\Contracts\InstallableTunnel;
-use Laragear\Expose\Support\ComposerConfig;
+use Laragear\Expose\Support\BinaryManager;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Style\SymfonyStyle;
-use const DIRECTORY_SEPARATOR;
 
 /**
  * Updates the tunnel service binary to the latest available version.
  */
 class UpdateCommand extends BaseCommand
 {
-    use ResolvesTunnel;
+    use Concerns\ResolvesServices;
 
     /**
      * Configures the command name, description, and options.
@@ -38,26 +35,25 @@ class UpdateCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $config = new ComposerConfig(getcwd().DIRECTORY_SEPARATOR.'composer.json');
-        $force = (bool) $input->getOption('force');
+        $key = $this->requireSavedTunnelKey($input->getOption('tunnel'));
 
-        $key = $this->requireSavedTunnelKey($config, $input->getOption('tunnel'));
         $tunnel = $this->registry()->make($key);
 
         if (!$tunnel instanceof InstallableTunnel) {
-            $io->error("{$tunnel->name()} is not installable. You have to install it manually.");
+            $this->io()->error("{$tunnel->name()} is not updateable. You have to update it manually.");
+
             return self::FAILURE;
         }
 
         if (!$tunnel->isInstalled()) {
-            $io->error("{$tunnel->name()} does not appear to be installed. Run `composer expose` first.");
+            $this->io()->note("{$tunnel->name()} does not appear to be installed.");
+
             return self::FAILURE;
         }
 
-        $io->title("Updating {$tunnel->name()}...");
-        $tunnel->update($io, $force);
-        $io->success("{$tunnel->name()} is up to date.");
+        $this->io()->title("Updating {$tunnel->name()}...");
+        $tunnel->update(app(BinaryManager::class), $this->io(), (bool) $input->getOption('force'));
+        $this->io()->success("{$tunnel->name()} is up to date.");
 
         return self::SUCCESS;
     }

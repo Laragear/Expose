@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
+use function json_decode;
 
 /**
  * Tunnel implementation for Zrok (zrok.io).
@@ -39,8 +42,8 @@ class ZrokTunnel extends AbstractTunnel
     public function configurableOptions(): array
     {
         return [
-            'token'      => ['label' => 'Zrok Enable Token', 'default' => null, 'secret' => true],
-            'share_mode' => ['label' => 'Share mode (public/private)', 'default' => 'public', 'secret' => false],
+            'token'      => Option::secret('Zrok Enable Token'),
+            'share_mode' => Option::name('Share mode (public/private)', 'public'),
         ];
     }
 
@@ -50,7 +53,8 @@ class ZrokTunnel extends AbstractTunnel
     public function configure(SymfonyStyle $io, array $values): void
     {
         if (! empty($values['token'])) {
-            $process = $this->buildProcess([$this->binaryCommand(), 'enable', $values['token']]);
+            $process = $this->buildProcess($this->binaryCommand(), 'enable')->args($values['token'])->process();
+
             $process->run();
 
             $io->success('Zrok enabled with the provided token.');
@@ -60,17 +64,19 @@ class ZrokTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $command = [
+        $process = $factory->command(
             $this->binaryCommand(),
-            'share', 'public',
+            'share',
+            'public',
             '--backend-mode', 'proxy',
             '--bind-addr', '127.0.0.1:' . self::CONSOLE_PORT,
-            "http://$host:$port",
-        ];
+            "http://$host:$port"
+        )
+            ->setTimeout(null)
+            ->process(); // @phpstan-ignore-line
 
-        $process = $this->buildProcess($command);
         $process->start();
 
         return $process;
@@ -81,9 +87,9 @@ class ZrokTunnel extends AbstractTunnel
      */
     protected function resolveDownloadUrl(): ?string
     {
-        $arch = php_uname('m') === 'arm64' ? 'arm64' : 'amd64';
+        $arch = $this->processFactory->arch() === 'arm64' ? 'arm64' : 'amd64';
 
-        return match (PHP_OS_FAMILY) {
+        return match ($this->processFactory->os()) {
             'Linux'   => "https://github.com/openziti/zrok/releases/latest/download/zrok_linux_{$arch}.tar.gz",
             'Darwin'  => "https://github.com/openziti/zrok/releases/latest/download/zrok_darwin_{$arch}.tar.gz",
             'Windows' => "https://github.com/openziti/zrok/releases/latest/download/zrok_windows_{$arch}.zip",
@@ -96,15 +102,8 @@ class ZrokTunnel extends AbstractTunnel
      */
     public function status(): array
     {
-        $context = stream_context_create([
-            'http' => [
-                'timeout'       => 2,
-                'ignore_errors' => true,
-            ],
-        ]);
-
         // When `zrok share public` runs it starts a local HTTP console server at
-        // 127.0.0.1:CONSOLE_PORT. The /api/v1/overview endpoint returns a JSON
+        // localhost:CONSOLE_PORT. The /api/v1/overview endpoint returns a JSON
         // document that includes a "shares" array; each entry contains:
         //   - "token"            -> the unique share identifier
         //   - "frontendEndpoint" -> the public HTTPS URL (e.g. https://xxx.share.zrok.io)
@@ -112,17 +111,9 @@ class ZrokTunnel extends AbstractTunnel
         //
         // If the console is unreachable (connection refused) or the response cannot
         // be decoded the tunnel is considered not running.
-        $raw = @file_get_contents(
-            'http://127.0.0.1:' . self::CONSOLE_PORT . '/api/v1/overview', false, $context,
-        );
+        $raw = $this->http->localGet(self::CONSOLE_PORT, '/api/v1/overview');
 
-        if ($raw === false) {
-            return ['running' => false, 'url' => null, 'connections' => null];
-        }
-
-        $data = json_decode($raw, true);
-
-        if (! is_array($data)) {
+        if ($raw === false || ! $data = json_decode($raw, true)) {
             return ['running' => false, 'url' => null, 'connections' => null];
         }
 

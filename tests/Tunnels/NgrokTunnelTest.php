@@ -4,19 +4,30 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Http;
+use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Tunnels\NgrokTunnel;
+use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /** Tests the NgrokTunnel implementation. */
 class NgrokTunnelTest extends TestCase
 {
-    private NgrokTunnel $tunnel;
+    protected Http&MockInterface $http;
+    protected ProcessFactory&MockInterface $process;
+    protected NgrokTunnel $tunnel;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->tunnel = new NgrokTunnel();
+        $this->tunnel = new NgrokTunnel(
+            $this->http = $this->mock(Http::class),
+            $this->mock(BinaryManager::class),
+            $this->process = $this->mock(ProcessFactory::class)
+        );
     }
 
     public function test_name_is_ngrok(): void
@@ -44,7 +55,7 @@ class NgrokTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('authtoken', $options);
-        static::assertTrue($options['authtoken']['secret']);
+        static::assertTrue($options['authtoken']->isSecret);
     }
 
     public function test_configurable_options_contains_region(): void
@@ -52,21 +63,30 @@ class NgrokTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('region', $options);
-        static::assertSame('us', $options['region']['default']);
+        static::assertSame('us', $options['region']->default);
     }
 
-    public function test_download_url_is_non_null_on_supported_platforms(): void
+    #[DataProvider('providesArchAndOs')]
+    public function test_download_url_is_non_null_on_supported_platforms(string $os, string $arch): void
     {
-        if (! in_array(PHP_OS_FAMILY, ['Linux', 'Darwin', 'Windows'], true)) {
-            $this->markTestSkipped('Platform not supported.');
-        }
+        $this->process->expects('arch')->andReturn($arch);
+        $this->process->expects('os')->andReturn($os);
 
         static::assertNotNull($this->tunnel->downloadUrl());
     }
 
+    public function test_download_url_is_null_on_unsupported_platforms(): void
+    {
+        $this->process->expects('arch')->andReturn('invalid');
+        $this->process->expects('os')->andReturn('invalid');
+
+        static::assertNull($this->tunnel->downloadUrl());
+    }
+
     public function test_status_returns_not_running_when_api_unreachable(): void
     {
-        // With no ngrok running, the local API will be unreachable
+        $this->http->expects('localGet')->with(4040, 'api/tunnels', false)->andReturnFalse();
+
         $status = $this->tunnel->status();
 
         static::assertFalse($status['running']);

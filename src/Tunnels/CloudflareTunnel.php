@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
+use function json_decode;
 
 /**
  * Tunnel implementation for Cloudflare Tunnel via the `cloudflared` binary.
@@ -39,18 +42,20 @@ class CloudflareTunnel extends AbstractTunnel
     public function configurableOptions(): array
     {
         return [
-            'token'    => ['label' => 'Cloudflare Tunnel Token (optional for quick tunnels)', 'default' => null, 'secret' => true],
-            'hostname' => ['label' => 'Custom hostname (optional)', 'default' => null, 'secret' => false],
+            'token' => Option::secret('Cloudflare Tunnel Token (optional for quick tunnels)')->optional(),
+            'hostname' => Option::name('Custom hostname (optional)')->optional(),
         ];
     }
 
     /**
      * Installs the tunnel service token via `cloudflared service install`.
+     *
+     * @inheritDoc
      */
     public function configure(SymfonyStyle $io, array $values): void
     {
-        if (! empty($values['token'])) {
-            $this->buildProcess([$this->binaryCommand(), 'service', 'install', $values['token']])->run();
+        if (!empty($values['token'])) {
+            $this->buildProcess($this->binaryCommand(), 'service', 'install')->args($values['token'])->run();
 
             $io->success('Cloudflare Tunnel token installed.');
         }
@@ -59,15 +64,17 @@ class CloudflareTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $process = $this->buildProcess([
+        $process = $factory->command(
             $this->binaryCommand(),
             'tunnel',
             '--url', "http://$host:$port",
-            '--metrics', 'localhost:' . self::METRICS_PORT,
+            '--metrics', 'localhost:'.self::METRICS_PORT,
             '--no-autoupdate',
-        ]);
+        )
+            ->setTimeout(null)
+            ->process(); // @phpstan-ignore-line
 
         $process->start();
 
@@ -79,13 +86,13 @@ class CloudflareTunnel extends AbstractTunnel
      */
     protected function resolveDownloadUrl(): ?string
     {
-        $arch = php_uname('m') === 'arm64' ? 'arm64' : 'amd64';
+        $arch = $this->processFactory->arch() === 'arm64' ? 'arm64' : 'amd64';
 
-        return match (PHP_OS_FAMILY) {
-            'Linux'   => "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$arch",
-            'Darwin'  => "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-$arch.tgz",
+        return match ($this->processFactory->os()) {
+            'Linux' => "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$arch",
+            'Darwin' => "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-$arch.tgz",
             'Windows' => "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-$arch.exe",
-            default   => null,
+            default => null,
         };
     }
 
@@ -112,20 +119,12 @@ class CloudflareTunnel extends AbstractTunnel
      */
     public function status(): array
     {
-        $context = stream_context_create([
-            'http' => [
-                'timeout'       => 2,
-                'ignore_errors' => true, // read body even on 4xx/5xx responses
-            ],
-        ]);
+        $raw = $this->http->localGet(self::METRICS_PORT, 'ready');
 
-        $raw = @file_get_contents('http://127.0.0.1:' . self::METRICS_PORT . '/ready', false, $context);
-
-        if ($raw === false) {
+        if ($raw === false || !$data = json_decode($raw, true)) {
             return ['running' => false, 'url' => null, 'connections' => null];
         }
 
-        $data    = json_decode($raw, true);
         $running = ($data['status'] ?? '') === 'ok';
 
         return ['running' => $running, 'url' => null, 'connections' => null];

@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Http;
+use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Tunnels\InstatunnelTunnel;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /** Tests the InstatunnelTunnel implementation. */
 class InstatunnelTunnelTest extends TestCase
 {
-    private InstatunnelTunnel $tunnel;
+    protected Http&MockInterface $http;
+    protected ProcessFactory&MockInterface $process;
+    protected InstatunnelTunnel $tunnel;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->tunnel = new InstatunnelTunnel();
+        $this->tunnel = new InstatunnelTunnel(
+            $this->http = $this->mock(Http::class),
+            $this->mock(BinaryManager::class),
+            $this->process = $this->mock(ProcessFactory::class)
+        );
     }
 
     public function test_name_is_instunnel(): void
@@ -49,7 +59,7 @@ class InstatunnelTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('token', $options);
-        static::assertTrue($options['token']['secret']);
+        static::assertTrue($options['token']->isSecret);
     }
 
     public function test_configurable_options_has_non_secret_subdomain(): void
@@ -57,6 +67,6 @@ class InstatunnelTunnelTest extends TestCase
         $options = $this->tunnel->configurableOptions();
 
         static::assertArrayHasKey('subdomain', $options);
-        static::assertFalse($options['subdomain']['secret']);
+        static::assertFalse($options['subdomain']->isSecret);
     }
 }

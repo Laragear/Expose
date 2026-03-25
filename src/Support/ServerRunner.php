@@ -7,14 +7,19 @@ namespace Laragear\Expose\Support;
 use Laragear\Expose\Enums\Framework;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
+use function explode;
 
-/** Starts a local PHP development server appropriate for the detected framework. */
+/**
+ * Starts a local PHP development server appropriate for the detected framework.
+ */
 class ServerRunner
 {
-    public function __construct(
-        /** The absolute path to the project root directory. */
-        protected readonly string $projectRoot,
-    ) {
+    /**
+     * Create a new Server Runner instance.
+     */
+    public function __construct(protected File $file, protected ProcessFactory $process, protected string $projectRoot)
+    {
+        //
     }
 
     /**
@@ -33,27 +38,31 @@ class ServerRunner
         return $process;
     }
 
-    /** Builds a Process for the framework's own CLI dev-server command. */
+    /**
+     * Builds a Process for the framework's own CLI dev-server command.
+     */
     protected function buildNativeServerProcess(Framework $framework, string $host, int $port): Process
     {
-        $command = str_replace(
+        $command = explode(' ', str_replace(
             ['{host}', '{port}'],
             [$host, (string) $port],
-            (string) $framework->serverCommand()
-        );
+            (string) $framework->serverCommand(),
+        ));
 
-        return Process::fromShellCommandline($command, $this->projectRoot);
+        return $this->process->command(...$command)->process();
     }
 
-    /** Builds a Process using PHP's built-in web server targeting the framework's public directory. */
+    /**
+     * Builds a Process using PHP's built-in web server targeting the framework's public directory.
+     */
     protected function buildPhpBuiltinProcess(Framework $framework, string $host, int $port): Process
     {
-        $php     = (new ExecutableFinder())->find('php') ?? 'php';
-        $docRoot = $this->projectRoot . DIRECTORY_SEPARATOR . $framework->publicDir();
+        $php = $this->file->findOnPath('php') ?? 'php';
+        $docRoot = $this->projectRoot.DIRECTORY_SEPARATOR.$framework->publicDir();
 
-        return new Process(
-            [$php, '-S', "{$host}:{$port}", '-t', $docRoot],
-            $this->projectRoot,
-        );
+        return $this->process
+            ->command($php, '-S', "$host:$port", '-t', $docRoot)
+            ->workDir($this->projectRoot)
+            ->process();
     }
 }

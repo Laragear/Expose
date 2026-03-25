@@ -1,83 +1,170 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Tests\Commands;
 
 use Laragear\Expose\Commands\UninstallCommand;
+use Laragear\Expose\Commands\UpdateCommand;
+use Laragear\Expose\Contracts\InstallableTunnel;
+use Laragear\Expose\Contracts\Tunnel;
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\ComposerConfig;
+use Laragear\Expose\Support\TunnelRegistry;
+use Mockery;
+use Mockery\MockInterface;
 use RuntimeException;
-use Symfony\Component\Console\Command\Command;
-use const DIRECTORY_SEPARATOR;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
+use Symfony\Component\Console\Style\SymfonyStyle;
+use Tests\TestCase;
 
-/** Tests UninstallCommand guard rails, confirmation prompts, and purge behaviour. */
-class UninstallCommandTest extends CommandTestCase
+class UninstallCommandTest extends TestCase
 {
-    protected function makeCommand(): Command
+    protected UninstallCommand $command;
+
+    protected function setUp(): void
     {
-        return new UninstallCommand();
+        parent::setUp();
+
+        $this->command = new UninstallCommand();
     }
 
-    public function test_throws_when_no_tunnel_configured(): void
+    public function test_command_configuration(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir);
+        static::assertSame('expose:uninstall', $this->command->getName());
+        static::assertSame('Uninstall the tunnel service binary.', $this->command->getDescription());
 
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessageMatches('/No tunnel service configured/');
+        static::assertCount(2, $this->command->getDefinition()->getOptions());
 
-            $this->runCommand();
-        });
+        $optionTunnel = $this->command->getDefinition()->getOption('tunnel');
+
+        static::assertSame('tunnel', $optionTunnel->getName());
+        static::assertSame('t', $optionTunnel->getShortcut());
+        static::assertNull($optionTunnel->getDefault());
+        static::assertSame('Override which tunnel to uninstall.', $optionTunnel->getDescription());
+
+        $optionTunnel = $this->command->getDefinition()->getOption('purge');
+
+        static::assertSame('purge', $optionTunnel->getName());
+        static::assertNull($optionTunnel->getShortcut());
+        static::assertFalse($optionTunnel->getDefault());
+        static::assertSame('Also remove all Expose config from composer.json.', $optionTunnel->getDescription());
     }
 
-    public function test_skips_gracefully_when_tunnel_not_installed(): void
+    public function test_fails_without_tunnel(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir, ['tunnel' => 'zrok']);
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturnNull();
 
-            // zrok not installed → note and exit success
-            $tester = $this->runAndGetTester([], ['decorated' => false]);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No tunnel service configured. Run `composer expose` first.');
 
-            static::assertSame(Command::SUCCESS, $tester->getStatusCode());
-            static::assertStringContainsString('not appear to be installed', $tester->getDisplay());
-        });
+        $this->command->run(new ArrayInput([]), new NullOutput());
     }
 
-    public function test_tunnel_override_option_is_respected(): void
+    public function test_fails_if_tunnel_not_installable(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
-            $this->seedComposerJson($dir, ['tunnel' => 'ngrok']);
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('test-key');
 
-            $tester = $this->runAndGetTester(['--tunnel' => 'zrok'], ['decorated' => false]);
-
-            // Should mention zrok, not ngrok
-            static::assertStringContainsStringIgnoringCase('zrok', $tester->getDisplay());
+        $tunnel = $this->mock(Tunnel::class, static function (MockInterface $mock): void {
+            $mock->expects('name')->andReturn('test-name');
         });
+
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('error')->with('test-name is not uninstallable. You have to remove it manually.');
+        });
+
+        $this->mock(TunnelRegistry::class)->expects('make')->with('test-key')->andReturn($tunnel);
+
+        static::assertSame(UninstallCommand::FAILURE, $this->command->run(new ArrayInput([]), new NullOutput()));
     }
 
-    public function test_purge_removes_expose_block_from_composer_json(): void
+    public function test_fails_if_tunnel_is_not_installed(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            chdir($dir);
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('test-key');
 
-            // Plant a locally managed fake binary so the tunnel appears "installed"
-            $binPath = $dir.DIRECTORY_SEPARATOR.'.expose'.DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'zrok';
-            mkdir(dirname($binPath), 0755, true);
-            file_put_contents($binPath, '#!/bin/sh');
-            chmod($binPath, 0755);
-
-            $this->seedComposerJson($dir, ['tunnel' => 'zrok', 'options' => ['share_mode' => 'public']]);
-
-            $this->runAndGetTester(
-                ['--tunnel' => 'zrok', '--purge' => true],
-                ['decorated' => false, 'inputs' => ['yes']],   // confirm the prompt
-            );
-
-            $decoded = json_decode(file_get_contents($dir.DIRECTORY_SEPARATOR.'composer.json'), true);
-
-            static::assertEmpty($decoded['extra']['expose']);
+        $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock): void {
+            $mock->expects('name')->andReturn('test-name');
+            $mock->expects('isInstalled')->andReturnFalse();
         });
+
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('note')->with('test-name does not appear to be installed.');
+        });
+
+        $this->mock(TunnelRegistry::class)->expects('make')->with('test-key')->andReturn($tunnel);
+
+        static::assertSame(UninstallCommand::FAILURE, $this->command->run(new ArrayInput([]), new NullOutput()));
+    }
+
+    public function test_fails_if_tunnel_uninstallation_is_not_confirmed(): void
+    {
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('test-key');
+
+        $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock): void {
+            $mock->expects('name')->andReturn('test-name');
+            $mock->expects('isInstalled')->andReturnTrue();
+        });
+
+        $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('confirm')->with('Are you sure you want to uninstall test-name?', false)->andReturnFalse();
+            $mock->expects('error')->with('Uninstall cancelled.');
+        });
+
+        $this->mock(TunnelRegistry::class)->expects('make')->with('test-key')->andReturn($tunnel);
+
+        static::assertSame(UninstallCommand::FAILURE, $this->command->run(new ArrayInput([]), new NullOutput()));
+    }
+
+    public function test_uninstalls_tunnel(): void
+    {
+        $this->mock(ComposerConfig::class)->expects('get')->with('tunnel')->andReturn('test-key');
+
+        $io = $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('confirm')->with('Are you sure you want to uninstall test-name?', false)->andReturnTrue();
+            $mock->expects('title')->with('Uninstalling test-name...');
+            $mock->expects('success')->with('test-name has been uninstalled.');
+        });
+
+        $this->mock(BinaryManager::class);
+
+        $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock) use ($io): void {
+            $mock->expects('name')->times(3)->andReturn('test-name');
+            $mock->expects('isInstalled')->andReturnTrue();
+            $mock->expects('uninstall')->with(Mockery::type(BinaryManager::class), $io);
+        });
+
+        $this->mock(TunnelRegistry::class)->expects('make')->with('test-key')->andReturn($tunnel);
+
+        static::assertSame(UninstallCommand::SUCCESS, $this->command->run(new ArrayInput([]), new NullOutput()));
+    }
+
+    public function test_uninstall_with_purge(): void
+    {
+        $this->mock(ComposerConfig::class, static function (MockInterface $mock): void {
+            $mock->expects('get')->with('tunnel')->andReturn('test-key');
+            $mock->expects('all')->andReturn(['foo' => 'first', 'bar' => 'second']);
+            $mock->expects('forget')->with('foo');
+            $mock->expects('forget')->with('bar');
+        });
+
+        $io = $this->mock(SymfonyStyle::class, static function (MockInterface $mock): void {
+            $mock->expects('confirm')->with('Are you sure you want to uninstall test-name?', false)->andReturnTrue();
+            $mock->expects('title')->with('Uninstalling test-name...');
+            $mock->expects('success')->with('test-name has been uninstalled.');
+            $mock->expects('text')->with('Expose configuration removed from <comment>composer.json</comment>.');
+        });
+
+        $this->mock(BinaryManager::class);
+
+        $tunnel = $this->mock(InstallableTunnel::class, static function (MockInterface $mock) use ($io): void {
+            $mock->expects('name')->times(3)->andReturn('test-name');
+            $mock->expects('isInstalled')->andReturnTrue();
+            $mock->expects('uninstall')->with(Mockery::type(BinaryManager::class), $io);
+        });
+
+        $this->mock(TunnelRegistry::class)->expects('make')->with('test-key')->andReturn($tunnel);
+
+        static::assertSame(
+            UninstallCommand::SUCCESS, $this->command->run(new ArrayInput(['--purge' => true]), new NullOutput())
+        );
     }
 }

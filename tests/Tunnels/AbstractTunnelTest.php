@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Tunnels;
 
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Http;
+use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Tunnels\AbstractTunnel;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -12,7 +15,7 @@ use Tests\TestCase;
 class AbstractTunnelTest extends TestCase
 {
     /** Returns a minimal concrete subclass of AbstractTunnel for testing. */
-    private function makeTunnel(array $overrides = []): AbstractTunnel
+    protected function makeTunnel(array $overrides = []): AbstractTunnel
     {
         return new class($overrides) extends AbstractTunnel {
             public function __construct(private readonly array $overrides = [])
@@ -30,9 +33,9 @@ class AbstractTunnelTest extends TestCase
                 return $this->overrides['binary'] ?? 'testtunnel';
             }
 
-            public function start(string $host = 'localhost', int $port = 8080): Process
+            public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
             {
-                return $this->buildProcess(['echo', 'started']);
+                return $this->buildProcess('echo', 'started');
             }
 
             /**
@@ -75,9 +78,9 @@ class AbstractTunnelTest extends TestCase
     }
 
     /** Returns an npm-based concrete tunnel for testing npm paths. */
-    private function makeNpmTunnel(): AbstractTunnel
+    protected function makeNpmTunnel(): AbstractTunnel
     {
-        return new class extends AbstractTunnel {
+        return new class($this->mock(Http::class), $this->mock(BinaryManager::class), $this->mock(ProcessFactory::class)) extends AbstractTunnel {
             protected bool $npmPackage = true;
             protected ?string $npmPackageName = 'my-package';
 
@@ -91,9 +94,9 @@ class AbstractTunnelTest extends TestCase
                 return 'npmtunnel';
             }
 
-            public function start(string $host = 'localhost', int $port = 8080): Process
+            public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
             {
-                return $this->buildProcess(['echo', 'started']);
+                return $this->buildProcess('echo', 'started');
             }
 
             /**

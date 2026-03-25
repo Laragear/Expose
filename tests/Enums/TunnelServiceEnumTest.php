@@ -6,6 +6,9 @@ namespace Tests\Enums;
 
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\TunnelService;
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\Http;
+use Laragear\Expose\Support\ProcessFactory;
 use Laragear\Expose\Tunnels\CloudflareTunnel;
 use Laragear\Expose\Tunnels\InstatunnelTunnel;
 use Laragear\Expose\Tunnels\LocaltunnelTunnel;
@@ -15,10 +18,17 @@ use Laragear\Expose\Tunnels\ZrokTunnel;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
-/** Tests the TunnelService enum factory, labels, and parsing helpers. */
 class TunnelServiceEnumTest extends TestCase
 {
-    /** Returns all services with their expected Tunnel implementation class. */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->mock(BinaryManager::class);
+        $this->mock(Http::class);
+        $this->mock(ProcessFactory::class);
+    }
+
     public static function serviceImplementationProvider(): array
     {
         return [
@@ -40,18 +50,6 @@ class TunnelServiceEnumTest extends TestCase
 
         static::assertInstanceOf(Tunnel::class, $tunnel);
         static::assertInstanceOf($expectedClass, $tunnel);
-    }
-
-    public function test_from_string_or_null_returns_case_for_known_value(): void
-    {
-        static::assertSame(TunnelService::Ngrok, TunnelService::fromStringOrNull('ngrok'));
-        static::assertSame(TunnelService::Zrok, TunnelService::fromStringOrNull('zrok'));
-    }
-
-    public function test_from_string_or_null_returns_null_for_unknown_value(): void
-    {
-        static::assertNull(TunnelService::fromStringOrNull('unknown-service'));
-        static::assertNull(TunnelService::fromStringOrNull(''));
     }
 
     public function test_choice_map_contains_all_services(): void

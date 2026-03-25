@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Laragear\Expose\Tunnels;
 
+use Laragear\Expose\Support\Option;
+use Laragear\Expose\Support\ProcessFactory;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 
@@ -44,8 +46,8 @@ class InstatunnelTunnel extends AbstractTunnel
     public function configurableOptions(): array
     {
         return [
-            'token'     => ['label' => 'InsTunnel API Token', 'default' => null, 'secret' => true],
-            'subdomain' => ['label' => 'Preferred subdomain (leave blank for random)', 'default' => null, 'secret' => false],
+            'token' => Option::secret('InsTunnel API Token'),
+            'subdomain' => Option::name('Preferred subdomain (leave blank for random)'),
         ];
     }
 
@@ -54,9 +56,8 @@ class InstatunnelTunnel extends AbstractTunnel
      */
     public function configure(SymfonyStyle $io, array $values): void
     {
-        if (! empty($values['token'])) {
-            $process = $this->buildProcess([$this->binaryCommand(), 'auth', $values['token']]);
-            $process->run();
+        if (!empty($values['token'])) {
+            $this->buildProcess($this->binaryCommand(), 'auth')->args($values['token'])->run();
 
             $io->success('InsTunnel token saved.');
         }
@@ -65,11 +66,11 @@ class InstatunnelTunnel extends AbstractTunnel
     /**
      * @inheritDoc
      */
-    public function start(string $host = 'localhost', int $port = 8080): Process
+    public function start(ProcessFactory $factory, string $host = 'localhost', int $port = 8080): Process
     {
-        $command = [$this->binaryCommand(), '--port', (string) $port, '--host', $host];
-
-        $process = $this->buildProcess($command);
+        $process = $factory->command($this->binaryCommand(), '--port', (string) $port, '--host', $host)
+            ->setTimeout(null)
+            ->process(); // @phpstan-ignore-line
 
         $process->start();
 
@@ -89,8 +90,8 @@ class InstatunnelTunnel extends AbstractTunnel
         // The public URL is only available from the binary's stdout at startup and
         // cannot be retrieved after the fact, so it is always returned as null here.
         return [
-            'running'     => $this->isProcessRunning($this->npmPackageName ?? $this->binary()),
-            'url'         => null,
+            'running' => $this->isProcessRunning($this->npmPackageName ?? $this->binary()),
+            'url' => null,
             'connections' => null,
         ];
     }

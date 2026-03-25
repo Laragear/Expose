@@ -6,291 +6,327 @@ namespace Tests\Support;
 
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Enums\TunnelService;
+use Laragear\Expose\Support\BinaryManager;
+use Laragear\Expose\Support\File;
 use Laragear\Expose\Support\TunnelRegistry;
 use Laragear\Expose\Tunnels\AbstractTunnel;
+use Laragear\Expose\Tunnels\NgrokTunnel;
+use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
+use function json_encode;
 
-/** Tests TunnelRegistry built-in loading, project-level discovery, and package-level discovery. */
 class TunnelRegistryTest extends TestCase
 {
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
+    protected File&MockInterface $file;
+    protected TunnelRegistry $registry;
 
-    /** Builds a registry pointing at a temp dir with a minimal composer.json. */
-    private function makeRegistry(string $dir, array $expose = []): TunnelRegistry
+    protected function setUp(): void
     {
-        $data = ['name' => 'test/app', 'require' => new \stdClass()];
+        parent::setUp();
 
-        if ($expose !== []) {
-            $data['extra']['expose'] = $expose;
-        }
+        $this->mock(BinaryManager::class);
+        $this->file = $this->mock(File::class);
+        $this->file->expects('missing')->with('/app/composer.json')->andReturnTrue();
+        $this->file->expects('isNotDir')->with('/app/vendor')->andReturnTrue();
 
-        file_put_contents($dir.'/composer.json', json_encode($data, JSON_PRETTY_PRINT));
-
-        return new TunnelRegistry($dir);
+        $this->registry = new TunnelRegistry($this->file, '/app');
     }
 
-    /** Writes a fake installed-package composer.json with an expose-tunnel declaration. */
-    private function writeFakePackage(string $vendorDir, string $vendor, string $name, array $definition): void
+    public function test_choice_map(): void
     {
-        $packageDir = $vendorDir."/{$vendor}/{$name}";
-        mkdir($packageDir, 0755, true);
+        static::assertSame([
+            'ngrok' => 'ngrok (ngrok.com)',
+            'cloudflare' => 'Cloudflare Tunnel (cloudflared)',
+            'instatunnel' => 'InsTunnel (instatunnel.com)',
+            'localtunnel' => 'Localtunnel (localtunnel.me) [npm]',
+            'pinggy' => 'Pinggy (pinggy.io) [ssh-based]',
+            'zrok' => 'Zrok (zrok.io)',
+        ], $this->registry->choiceMap());
+    }
 
-        file_put_contents(
-            $packageDir.'/composer.json',
-            json_encode(['name' => "{$vendor}/{$name}", 'extra' => ['expose-tunnel' => $definition]], JSON_PRETTY_PRINT),
+    public static function providesInvalidChoiceMap(): array
+    {
+        return [
+            [['class' => NgrokTunnel::class]],
+            [['label' => 'test-label']],
+            [[]],
+        ];
+    }
+
+    #[DataProvider('providesInvalidChoiceMap')]
+    public function test_choice_map_fails_if_no_label(array $map): void
+    {
+        $file = $this->mock(File::class);
+        $file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $file->expects('get')->with('/app/composer.json')->andReturn(json_encode([
+            'extra' => [
+                'expose' => [
+                    'tunnels' => [
+                        'test-key' => $map
+                    ]
+                ]
+            ]
+        ]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Tunnel definition for [test-key] in [project composer.json] must have both 'label' and 'class' keys");
+
+        new TunnelRegistry($file, '/app');
+    }
+
+    public function test_choice_map_fails_if_class_does_not_exist(): void
+    {
+        $file = $this->mock(File::class);
+        $file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $file->expects('get')->with('/app/composer.json')->andReturn(json_encode([
+            'extra' => [
+                'expose' => [
+                    'tunnels' => [
+                        'test-key' => [
+                            'label' => 'test-label',
+                            'class' => '\Invalid\Class',
+                        ]
+                    ]
+                ]
+            ]
+        ]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Tunnel class [\Invalid\Class] does not exist. Check your autoloader.');
+
+        new TunnelRegistry($file, '/app');
+    }
+
+    public function test_choice_map_fails_if_class_does_not_implement_tunnel(): void
+    {
+        $file = $this->mock(File::class);
+        $file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $file->expects('get')->with('/app/composer.json')->andReturn(json_encode([
+            'extra' => [
+                'expose' => [
+                    'tunnels' => [
+                        'test-key' => [
+                            'label' => 'test-label',
+                            'class' => static::class,
+                        ]
+                    ]
+                ]
+            ]
+        ]));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Tunnel class [Tests\Support\TunnelRegistryTest] must implement Laragear\Expose\Contracts\Tunnel.');
+
+        new TunnelRegistry($file, '/app');
+    }
+
+    public function test_choice_map_includes_from_composer_json(): void
+    {
+        $file = $this->mock(File::class);
+        $file->expects('missing')->with('/app/composer.json')->andReturnFalse();
+        $file->expects('get')->with('/app/composer.json')->andReturn(json_encode([
+            'extra' => [
+                'expose' => [
+                    'tunnels' => [
+                        'test-key' => [
+                            'label' => 'test-label',
+                            'class' => NgrokTunnel::class,
+                        ]
+                    ]
+                ]
+            ]
+        ]));
+        $file->expects('isNotDir')->with('/app/vendor')->andReturnTrue();
+
+        $registry = new TunnelRegistry($file, '/app');
+
+        static::assertSame([
+            'ngrok' => 'ngrok (ngrok.com)',
+            'cloudflare' => 'Cloudflare Tunnel (cloudflared)',
+            'instatunnel' => 'InsTunnel (instatunnel.com)',
+            'localtunnel' => 'Localtunnel (localtunnel.me) [npm]',
+            'pinggy' => 'Pinggy (pinggy.io) [ssh-based]',
+            'zrok' => 'Zrok (zrok.io)',
+            'test-key' => 'test-label'
+        ], $registry->choiceMap());
+    }
+
+
+    #[DataProvider('providesInvalidChoiceMap')]
+    public function test_loads_from_package_fails_if_empty(array $invalid): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $file = $this->mock(File::class);
+        $file->expects('missing')->with('/app/composer.json')->andReturnTrue();
+        $file->expects('isNotDir')->with('/app/vendor')->andReturnFalse();
+        $file->expects('glob')->with('/app/vendor/*/*/composer.json')->andReturn([
+            '/app/vendor/foo-vendor/foo-package/composer.json',
+            '/app/vendor/bar-vendor/bar-package/composer.json',
+        ]);
+        $file->expects('missing')->with('/app/vendor/foo-vendor/foo-package/composer.json')->andReturnFalse();
+        $file->expects('get')->with('/app/vendor/foo-vendor/foo-package/composer.json')->andReturn(json_encode([
+            'extra' => [
+                'expose-tunnel' => [
+                    'key' => 'package-tunnel-key',
+                    ...$invalid
+                ]
+            ]
+        ]));
+        $file->expects('missing')->with('/app/vendor/bar-vendor/bar-package/composer.json')->andReturnTrue();
+
+        $this->mock(SymfonyStyle::class)
+            ->expects('warning')
+            ->with("Tunnel definition for [package-tunnel-key] in [/app/vendor/foo-vendor/foo-package/composer.json] must have both 'label' and 'class' keys.");
+
+        new TunnelRegistry($file, '/app');
+    }
+
+    public function test_loads_from_package_fails_if_class_does_not_exists(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $file = $this->mock(File::class);
+        $file->expects('missing')->with('/app/composer.json')->andReturnTrue();
+        $file->expects('isNotDir')->with('/app/vendor')->andReturnFalse();
+        $file->expects('glob')->with('/app/vendor/*/*/composer.json')->andReturn([
+            '/app/vendor/foo-vendor/foo-package/composer.json',
+            '/app/vendor/bar-vendor/bar-package/composer.json',
+        ]);
+        $file->expects('missing')->with('/app/vendor/foo-vendor/foo-package/composer.json')->andReturnFalse();
+        $file->expects('get')->with('/app/vendor/foo-vendor/foo-package/composer.json')->andReturn(json_encode([
+            'extra' => [
+                'expose-tunnel' => [
+                    'key' => 'package-tunnel-key',
+                    'label' => 'package-label',
+                    'class' => '\Invalid\Class',
+                ]
+            ]
+        ]));
+        $file->expects('missing')->with('/app/vendor/bar-vendor/bar-package/composer.json')->andReturnTrue();
+
+        $this->mock(SymfonyStyle::class)
+            ->expects('warning')
+            ->with("Tunnel class [\Invalid\Class] does not exist. Check your autoloader.");
+
+        new TunnelRegistry($file, '/app');
+    }
+
+    public function test_loads_from_package_fails_if_class_does_not_implement_tunnel(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $file = $this->mock(File::class);
+        $file->expects('missing')->with('/app/composer.json')->andReturnTrue();
+        $file->expects('isNotDir')->with('/app/vendor')->andReturnFalse();
+        $file->expects('glob')->with('/app/vendor/*/*/composer.json')->andReturn([
+            '/app/vendor/foo-vendor/foo-package/composer.json',
+            '/app/vendor/bar-vendor/bar-package/composer.json',
+        ]);
+        $file->expects('missing')->with('/app/vendor/foo-vendor/foo-package/composer.json')->andReturnFalse();
+        $file->expects('get')->with('/app/vendor/foo-vendor/foo-package/composer.json')->andReturn(json_encode([
+            'extra' => [
+                'expose-tunnel' => [
+                    'key' => 'package-tunnel-key',
+                    'label' => 'package-label',
+                    'class' => static::class,
+                ]
+            ]
+        ]));
+        $file->expects('missing')->with('/app/vendor/bar-vendor/bar-package/composer.json')->andReturnTrue();
+
+        $this->mock(SymfonyStyle::class)
+            ->expects('warning')
+            ->with("Tunnel class [Tests\Support\TunnelRegistryTest] must implement Laragear\Expose\Contracts\Tunnel.");
+
+        new TunnelRegistry($file, '/app');
+    }
+
+    public function test_loads_from_package(): void
+    {
+        $file = $this->mock(File::class);
+        $file->expects('missing')->with('/app/composer.json')->andReturnTrue();
+        $file->expects('isNotDir')->with('/app/vendor')->andReturnFalse();
+        $file->expects('glob')->with('/app/vendor/*/*/composer.json')->andReturn([
+            '/app/vendor/foo-vendor/foo-package/composer.json',
+            '/app/vendor/bar-vendor/bar-package/composer.json',
+        ]);
+        $file->expects('missing')->with('/app/vendor/foo-vendor/foo-package/composer.json')->andReturnTrue();
+        $file->expects('missing')->with('/app/vendor/bar-vendor/bar-package/composer.json')->andReturnFalse();
+        $file->expects('get')->with('/app/vendor/bar-vendor/bar-package/composer.json')->andReturn(json_encode([
+            'extra' => [
+                'expose-tunnel' => [
+                    'key' => 'package-tunnel-key',
+                    'label' => 'package-label',
+                    'class' => NgrokTunnel::class,
+                ]
+            ]
+        ]));
+
+        $registry = new TunnelRegistry($file, '/app');
+
+        static::assertSame([
+            'ngrok' => 'ngrok (ngrok.com)',
+            'cloudflare' => 'Cloudflare Tunnel (cloudflared)',
+            'instatunnel' => 'InsTunnel (instatunnel.com)',
+            'localtunnel' => 'Localtunnel (localtunnel.me) [npm]',
+            'pinggy' => 'Pinggy (pinggy.io) [ssh-based]',
+            'zrok' => 'Zrok (zrok.io)',
+            'package-tunnel-key' => 'package-label'
+        ], $registry->choiceMap());
+    }
+
+    public function test_has(): void
+    {
+        static::assertTrue($this->registry->has('ngrok'));
+        static::assertFalse($this->registry->has('invalid'));
+    }
+
+    public function test_missing(): void
+    {
+        static::assertFalse($this->registry->missing('ngrok'));
+        static::assertTrue($this->registry->missing('invalid'));
+    }
+
+    public function test_make_fails_if_missing(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unknown tunnel service: [missing]. Register it under extra.expose.tunnels in your composer.json.');
+
+        $this->registry->make('missing');
+    }
+
+    public function test_make_uses_container(): void
+    {
+        $tunnel = $this->mock(NgrokTunnel::class);
+
+        static::assertSame($tunnel, $this->registry->make('ngrok'));
+    }
+
+    public function test_keys(): void
+    {
+        static::assertSame(
+            ['ngrok', 'cloudflare', 'instatunnel', 'localtunnel', 'pinggy', 'zrok'],
+            $this->registry->keys()
         );
     }
 
-    // -----------------------------------------------------------------------
-    // Built-in loading
-    // -----------------------------------------------------------------------
-
-    public function test_all_built_in_services_are_registered(): void
+    public function test_register_fails_if_class_does_not_implement_tunnel(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Tunnel class [Tests\Support\TunnelRegistryTest] must implement Laragear\Expose\Contracts\Tunnel');
 
-            foreach (TunnelService::cases() as $service) {
-                static::assertTrue($registry->has($service->value), "Missing built-in: {$service->value}");
-            }
-        });
+        $this->registry->register('test-key', 'test-label', static::class);
     }
 
-    public function test_make_returns_tunnel_instance_for_built_in(): void
+    public function test_register(): void
     {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir);
+        $this->registry->register('test-key', 'test-label', NgrokTunnel::class);
 
-            $tunnel = $registry->make('ngrok');
-
-            static::assertInstanceOf(Tunnel::class, $tunnel);
-        });
-    }
-
-    public function test_choice_map_includes_all_built_ins(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir);
-            $map = $registry->choiceMap();
-
-            foreach (TunnelService::cases() as $service) {
-                static::assertArrayHasKey($service->value, $map);
-            }
-        });
-    }
-
-    // -----------------------------------------------------------------------
-    // Project-level custom tunnels
-    // -----------------------------------------------------------------------
-
-    public function test_custom_tunnel_registered_from_project_composer_json(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir, [
-                'tunnels' => [
-                    'my-tunnel' => [
-                        'label' => 'My Custom Tunnel',
-                        'class' => FakeCustomTunnel::class,
-                    ],
-                ],
-            ]);
-
-            static::assertTrue($registry->has('my-tunnel'));
-        });
-    }
-
-    public function test_custom_tunnel_make_returns_correct_instance(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir, [
-                'tunnels' => [
-                    'my-tunnel' => [
-                        'label' => 'My Custom Tunnel',
-                        'class' => FakeCustomTunnel::class,
-                    ],
-                ],
-            ]);
-
-            $tunnel = $registry->make('my-tunnel');
-
-            static::assertInstanceOf(FakeCustomTunnel::class, $tunnel);
-        });
-    }
-
-    public function test_custom_tunnel_appears_in_choice_map(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir, [
-                'tunnels' => [
-                    'my-tunnel' => [
-                        'label' => 'My Custom Tunnel',
-                        'class' => FakeCustomTunnel::class,
-                    ],
-                ],
-            ]);
-
-            static::assertArrayHasKey('my-tunnel', $registry->choiceMap());
-            static::assertContains('My Custom Tunnel', $registry->choiceMap());
-        });
-    }
-
-    public function test_custom_tunnel_overrides_built_in_with_same_key(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir, [
-                'tunnels' => [
-                    'ngrok' => [
-                        'label' => 'Custom ngrok-compatible',
-                        'class' => FakeCustomTunnel::class,
-                    ],
-                ],
-            ]);
-
-            // The ngrok key should now resolve to our fake
-            $tunnel = $registry->make('ngrok');
-
-            static::assertInstanceOf(FakeCustomTunnel::class, $tunnel);
-        });
-    }
-
-    public function test_throws_when_custom_class_does_not_exist(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessageMatches('/does not exist/');
-
-            $this->makeRegistry($dir, [
-                'tunnels' => [
-                    'bad' => ['label' => 'Bad', 'class' => 'NonExistent\\ClassName'],
-                ],
-            ]);
-        });
-    }
-
-    public function test_throws_when_custom_class_does_not_implement_tunnel(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessageMatches('/must implement/');
-
-            $this->makeRegistry($dir, [
-                'tunnels' => [
-                    'bad' => ['label' => 'Bad', 'class' => \stdClass::class],
-                ],
-            ]);
-        });
-    }
-
-    public function test_throws_when_definition_is_missing_label(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessageMatches('/must have both/');
-
-            $this->makeRegistry($dir, [
-                'tunnels' => [
-                    'bad' => ['class' => FakeCustomTunnel::class],
-                ],
-            ]);
-        });
-    }
-
-    // -----------------------------------------------------------------------
-    // Package-level discovery
-    // -----------------------------------------------------------------------
-
-    public function test_tunnel_discovered_from_installed_package(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $vendorDir = $dir.'/vendor';
-
-            $this->writeFakePackage($vendorDir, 'acme', 'my-tunnel', [
-                'key' => 'acme-tunnel',
-                'label' => 'Acme Tunnel',
-                'class' => FakeCustomTunnel::class,
-            ]);
-
-            $registry = $this->makeRegistry($dir);
-
-            static::assertTrue($registry->has('acme-tunnel'));
-            static::assertInstanceOf(FakeCustomTunnel::class, $registry->make('acme-tunnel'));
-        });
-    }
-
-    public function test_package_without_expose_tunnel_key_is_ignored(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $vendorDir = $dir.'/vendor';
-            $packageDir = $vendorDir.'/vendor/other-package';
-            mkdir($packageDir, 0755, true);
-
-            file_put_contents(
-                $packageDir.'/composer.json',
-                json_encode(['name' => 'vendor/other-package'], JSON_PRETTY_PRINT),
-            );
-
-            $registry = $this->makeRegistry($dir);
-
-            // Should load without error and only have the built-ins
-            static::assertCount(count(TunnelService::cases()), $registry->keys());
-        });
-    }
-
-    public function test_make_throws_for_unregistered_key(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir);
-
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessageMatches('/Unknown tunnel service/');
-
-            $registry->make('does-not-exist');
-        });
-    }
-
-    // -----------------------------------------------------------------------
-    // Manual registration
-    // -----------------------------------------------------------------------
-
-    public function test_register_adds_tunnel_to_registry(): void
-    {
-        $this->withTempDir(function (string $dir): void {
-            $registry = $this->makeRegistry($dir);
-            $registry->register('manual', 'Manual Tunnel', FakeCustomTunnel::class);
-
-            static::assertTrue($registry->has('manual'));
-            static::assertInstanceOf(FakeCustomTunnel::class, $registry->make('manual'));
-        });
-    }
-}
-
-/** A minimal concrete tunnel used only in tests. */
-class FakeCustomTunnel extends AbstractTunnel
-{
-    public function name(): string
-    {
-        return 'Fake Custom';
-    }
-
-    public function binary(): string
-    {
-        return 'fake';
-    }
-
-    public function start(string $host = 'localhost', int $port = 8080): Process
-    {
-        return $this->buildProcess(['echo', 'fake']);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function label(): string
-    {
-        return 'test-fake label';
+        static::assertTrue($this->registry->has('test-key'));
     }
 }

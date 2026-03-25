@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Laragear\Expose\Detectors;
 
 use Laragear\Expose\Enums\Framework;
-use const DIRECTORY_SEPARATOR;
+use Laragear\Expose\Support\File;
+use const DIRECTORY_SEPARATOR as DS;
 
 /**
  * Detects which PHP framework or platform the current project uses.
@@ -39,7 +40,7 @@ class ProjectDetector
     /**
      * Create a new Project Detector instance.
      */
-    public function __construct(protected readonly string $projectRoot)
+    public function __construct(protected File $file, protected readonly string $projectRoot)
     {
         //
     }
@@ -86,9 +87,9 @@ class ProjectDetector
      */
     protected function detectFromEnvFile(): ?Framework
     {
-        $envPath = $this->projectRoot.DIRECTORY_SEPARATOR.'.env';
+        $envPath = $this->projectRoot.DS.'.env';
 
-        if (!file_exists($envPath)) {
+        if ($this->file->missing($envPath)) {
             return null;
         }
 
@@ -108,17 +109,17 @@ class ProjectDetector
      */
     protected function detectFromFilesystem(): ?Framework
     {
-        if (file_exists($this->projectRoot.DIRECTORY_SEPARATOR.'wp-config.php')
-            || file_exists($this->projectRoot.DIRECTORY_SEPARATOR.'wp-blog-header.php')) {
+        if ($this->file->exists($this->projectRoot.DS.'wp-config.php')
+            || $this->file->exists($this->projectRoot.DS.'wp-blog-header.php')) {
             return Framework::WordPress;
         }
 
-        if (file_exists($this->projectRoot.DIRECTORY_SEPARATOR.'artisan')) {
+        if ($this->file->exists($this->projectRoot.DS.'artisan')) {
             return Framework::Laravel;
         }
 
-        if (file_exists($this->projectRoot.DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'console')
-            && file_exists($this->projectRoot.DIRECTORY_SEPARATOR.'config'.DIRECTORY_SEPARATOR.'bundles.php')) {
+        if ($this->file->exists($this->projectRoot.DS.'bin'.DS.'console')
+            && $this->file->exists($this->projectRoot.DS.'config'.DS.'bundles.php')) {
             return Framework::Symfony;
         }
 
@@ -134,7 +135,7 @@ class ProjectDetector
     {
         $vars = [];
 
-        foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        foreach ($this->file->lines($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
             if (str_starts_with(trim($line), '#')) {
                 continue;
             }
@@ -168,13 +169,13 @@ class ProjectDetector
      */
     protected function readComposerJson(): ?array
     {
-        $path = $this->projectRoot.DIRECTORY_SEPARATOR.'composer.json';
+        $path = $this->projectRoot.DS.'composer.json';
 
-        if (!file_exists($path)) {
+        if ($this->file->missing($path)) {
             return null;
         }
 
-        $decoded = json_decode(file_get_contents($path), true);
+        $decoded = json_decode($this->file->get($path), true);
 
         return is_array($decoded) ? $decoded : null;
     }

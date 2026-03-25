@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace Laragear\Expose\Commands;
 
 use Composer\Command\BaseCommand;
-use Laragear\Expose\Commands\Concerns\ResolvesTunnel;
 use Laragear\Expose\Contracts\InstallableTunnel;
 use Laragear\Expose\Contracts\Tunnel;
 use Laragear\Expose\Support\ComposerConfig;
+use Laragear\Expose\Support\Option;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use const DIRECTORY_SEPARATOR;
+use function array_map;
 
 /**
  * Interactively configures the tunnel service credentials and common options.
  */
 class ConfigureCommand extends BaseCommand
 {
-    use ResolvesTunnel;
+    use Concerns\ResolvesServices;
 
     /**
      * Configures the command name, description, and options.
@@ -31,8 +31,9 @@ class ConfigureCommand extends BaseCommand
             ->setName('expose:configure')
             ->setDescription('Configure credentials and options for the tunnel service.')
             ->addOption('tunnel', 't', InputOption::VALUE_OPTIONAL, 'Override which tunnel to configure.')
-            ->addOption('reset', null, InputOption::VALUE_NONE,
-                'Reset the preferred tunnel choice stored in composer.json.');
+            ->addOption(
+                'reset', null, InputOption::VALUE_NONE, 'Reset the preferred tunnel choice stored in composer.json.'
+            );
     }
 
     /**
@@ -40,29 +41,27 @@ class ConfigureCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
-        $config = new ComposerConfig(getcwd().DIRECTORY_SEPARATOR.'composer.json');
-
         if ($input->getOption('reset')) {
-            $this->resetTunnelChoice($io, $config);
+            $this->resetTunnelChoice();
+
             return self::SUCCESS;
         }
 
-        $tunnel = $this->resolveTunnel($io, $config, $input->getOption('tunnel'));
+        $tunnel = $this->resolveTunnel($input->getOption('tunnel'));
 
-        $io->title("Configuring {$tunnel->name()}");
+        $this->io()->title("Configuring {$tunnel->name()}");
 
         if (!$tunnel instanceof InstallableTunnel || !$tunnel->isInstalled()) {
-            $io->warning("{$tunnel->name()} does not appear to be installed. Configuration may not persist.");
+            $this->io()->warning("{$tunnel->name()} does not appear to be installed. Configuration may not persist.");
         }
 
-        $values = $this->promptOptions($io, $tunnel);
+        $values = $this->promptOptions($tunnel);
 
-        $tunnel->configure($io, $values);
+        $tunnel->configure($this->io(), $values);
 
-        $this->persistNonSecretOptions($config, $values);
+        $this->persistNonSecretOptions($values);
 
-        $io->success("{$tunnel->name()} configured successfully.");
+        $this->io()->success("{$tunnel->name()} configured successfully.");
 
         return self::SUCCESS;
     }
@@ -70,35 +69,33 @@ class ConfigureCommand extends BaseCommand
     /**
      * Prompts the user for each configurable option and returns the collected values.
      */
-    protected function promptOptions(SymfonyStyle $io, Tunnel $tunnel): array
+    protected function promptOptions(Tunnel $tunnel): array
     {
-        $options = $tunnel->configurableOptions();
-
-        if (empty($options)) {
-            $io->note("{$tunnel->name()} has no configurable options.");
-
-            return [];
+        if ($options = $tunnel->configurableOptions()) {
+            return array_map(function (Option $option): ?string {
+                return $this->promptSingleOption($option);
+            }, $options);
         }
 
-        return array_map(function ($option) use ($io) {
-            return $this->promptSingleOption($io, $option);
-        }, $options);
+        $this->io()->note("{$tunnel->name()} has no configurable options.");
+
+        return [];
     }
 
     /**
      * Prompts for a single option, hiding input when marked as a secret.
-     *
-     * @param  array{label: string, type?: "text"|"password"|"select", default: mixed|null, required: bool, hint?: string, options: string[], secret: bool}  $option
      */
-    protected function promptSingleOption(SymfonyStyle $io, array $option): ?string
+    protected function promptSingleOption(Option $option): ?string
     {
-        if ($option['secret']) {
-            $value = $io->askHidden("{$option['label']} (leave blank to skip)");
-
-            return $value ?: null;
+        if ($option->isNotRequired()) {
+            return $option->default;
         }
 
-        return $io->ask($option['label'], $option['default']);
+        if ($option->isSecret) {
+            return $this->io()->askHidden("$option->label (leave blank to skip)") ?: null;
+        }
+
+        return $this->io()->ask($option->label, $option->default);
     }
 
     /**
@@ -106,11 +103,11 @@ class ConfigureCommand extends BaseCommand
      *
      * Sensitive values (marked secret) are intentionally never written to disk.
      */
-    protected function persistNonSecretOptions(ComposerConfig $config, array $values): void
+    protected function persistNonSecretOptions(array $values): void
     {
         foreach ($values as $key => $value) {
             if ($value !== null) {
-                $config->set("options.$key", $value);
+                $this->config()->set("options.$key", $value);
             }
         }
     }
@@ -118,10 +115,10 @@ class ConfigureCommand extends BaseCommand
     /**
      * Removes the saved tunnel preference from composer.json.
      */
-    protected function resetTunnelChoice(SymfonyStyle $io, ComposerConfig $config): void
+    protected function resetTunnelChoice(): void
     {
-        $config->forget('tunnel');
+        $this->config()->forget('tunnel');
 
-        $io->success('Tunnel preference reset. Run `composer expose` to choose again.');
+        $this->io()->success('Tunnel preference reset. Run `composer expose` to choose again.');
     }
 }
