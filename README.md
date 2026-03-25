@@ -42,7 +42,7 @@ This composer plugin manages popular tunneling services to expose your applicati
 |-----------------------------------------------------------------------------------------------------|---------------|---------------------|--------------------------|
 | [ngrok](https://ngrok.com)                                                                          | `ngrok`       | Binary (cURL)       | Optional (free tier)     |
 | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | `cloudflare`  | Binary (cURL)       | Optional (quick tunnels) |
-| [InsTunnel](https://instatunnel.com)                                                                | `instatunnel` | NPM package         | Optional                 |
+| [InstaTunnel](https://instatunnel.my)                                                               | `instatunnel` | NPM package         | Optional                 |
 | [Localtunnel](https://localtunnel.me)                                                               | `localtunnel` | NPM package         | No                       |
 | [Pinggy](https://pinggy.io)                                                                         | `pinggy`      | SSH (system binary) | Optional                 |
 | [Zrok](https://zrok.io)                                                                             | `zrok`        | Binary (cURL)       | Yes (free account)       |
@@ -193,22 +193,6 @@ If you're a package author, you can also make your package a _tunnel-provider_ b
         }
     }
 }
-```
-
-## Configuration
-
-You can publish the configuration through `vendor:publish`:
-
-```shell
-php artisan vendor:publish --provider="Laragear\Expose\ExposeServiceProvider" --tag="config"
-```
-
-You should receive a file with an array like this:
-
-```php
-return [
-    // ...
-]
 ```
 
 ## Security
