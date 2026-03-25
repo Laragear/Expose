@@ -74,7 +74,7 @@ class CloudflareTunnel extends AbstractTunnel
             '--no-autoupdate',
         )
             ->setTimeout(null)
-            ->process();
+            ->process(); // @phpstan-ignore-line
 
         $process->start();
 

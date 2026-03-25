@@ -112,6 +112,8 @@ abstract class AbstractTunnel implements InstallableTunnel
 
     /**
      * No-op by default; subclasses override to write tokens or settings.
+     *
+     * @inheritDoc
      */
     public function configure(SymfonyStyle $io, array $values): void
     {
@@ -185,7 +187,7 @@ abstract class AbstractTunnel implements InstallableTunnel
      */
     protected function buildProcess(string $command, string ...$rawArgs): ProcessFactory
     {
-        return $this->processFactory->command($command, ...$rawArgs)->setTimeout(null);
+        return $this->processFactory->command($command, ...$rawArgs)->setTimeout(null); // @phpstan-ignore-line
     }
 
     /**

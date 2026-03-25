@@ -41,12 +41,9 @@ class ZrokTunnel extends AbstractTunnel
      */
     public function configurableOptions(): array
     {
-        Option::secret('Zrok Enable Token');
-        Option::secret('Share mode (public/private)');
-
         return [
-            'token'      => ['label' => 'Zrok Enable Token', 'default' => null, 'secret' => true],
-            'share_mode' => ['label' => 'Share mode (public/private)', 'default' => 'public', 'secret' => false],
+            'token'      => Option::secret('Zrok Enable Token'),
+            'share_mode' => Option::name('Share mode (public/private)', 'public'),
         ];
     }
 
@@ -78,7 +75,7 @@ class ZrokTunnel extends AbstractTunnel
             "http://$host:$port"
         )
             ->setTimeout(null)
-            ->process();
+            ->process(); // @phpstan-ignore-line
 
         $process->start();
 

@@ -23,7 +23,7 @@ interface Tunnel
     /**
      * Persists a single configuration value for this tunnel service.
      *
-     * @param  array<string, \Laragear\Expose\Support\Option>  $values
+     * @param  array<string, string>  $values
      */
     public function configure(SymfonyStyle $io, array $values): void;
 

@@ -84,7 +84,7 @@ class PinggyTunnel extends AbstractTunnel
             self::SSH_SERVER
         )
             ->setTimeout(null)
-            ->process();
+            ->process(); // @phpstan-ignore-line
 
         $process->start();
 

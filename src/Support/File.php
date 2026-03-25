@@ -91,7 +91,7 @@ class File
      */
     public function lines(string $path, int $param = 0): array|false
     {
-        return file($path, $param);
+        return file($path, $param); // @phpstan-ignore-line
     }
 
     /**

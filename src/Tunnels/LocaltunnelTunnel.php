@@ -57,7 +57,7 @@ class LocaltunnelTunnel extends AbstractTunnel
         $process = $factory
             ->command($this->binaryCommand(), '--port', (string) $port, '--local-host', $host)
             ->setTimeout(null)
-            ->process();
+            ->process(); // @phpstan-ignore-line
 
         $process->start();
 

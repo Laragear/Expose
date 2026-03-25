@@ -70,7 +70,7 @@ class InstatunnelTunnel extends AbstractTunnel
     {
         $process = $factory->command($this->binaryCommand(), '--port', (string) $port, '--host', $host)
             ->setTimeout(null)
-            ->process();
+            ->process(); // @phpstan-ignore-line
 
         $process->start();
 

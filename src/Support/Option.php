@@ -2,6 +2,7 @@
 
 namespace Laragear\Expose\Support;
 
+/** @phpstan-consistent-constructor */
 class Option
 {
     /**

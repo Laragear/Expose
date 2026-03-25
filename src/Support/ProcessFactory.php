@@ -13,6 +13,8 @@ use const PHP_OS_FAMILY;
 
 /**
  * @mixin \Symfony\Component\Process\Process
+ *
+ * @phpstan-consistent-constructor
  */
 class ProcessFactory
 {
@@ -125,6 +127,8 @@ class ProcessFactory
 
     /**
      * Sets raw arguments to pass to the command.
+     *
+     * @return $this
      */
     public function raw(string ...$arguments): static
     {
