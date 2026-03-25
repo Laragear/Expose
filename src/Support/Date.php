@@ -4,6 +4,9 @@ namespace Laragear\Expose\Support;
 
 use function usleep;
 
+/**
+ * @codeCoverageIgnore
+ */
 class Date
 {
     /**

@@ -12,6 +12,9 @@ use function file_exists;
 use function file_get_contents;
 use function glob;
 
+/**
+ * @codeCoverageIgnore
+ */
 class File
 {
     /**

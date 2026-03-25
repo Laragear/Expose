@@ -6,6 +6,9 @@ use function file_get_contents;
 use function ltrim;
 use function stream_context_create;
 
+/**
+ * @codeCoverageIgnore
+ */
 class Http
 {
     /**

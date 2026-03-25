@@ -107,6 +107,7 @@ class BinaryManager
     {
         $this->process
             ->command('npm', 'uninstall', '-g', $package)
+            ->process()
             ->setTimeout(120)
             ->run();
     }
