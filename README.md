@@ -22,7 +22,7 @@ Your support allows me to keep this package free, up to date, and maintainable.
 * Linux or macOS (Windows _may_ work)
 * PHP 8.3 or later
 * Composer **2.6** or higher
-* A PHP project with a `composer.json` at the root
+* A PHP project with a `composer.json` at the root (recommended)
 
 ## Installation
 
